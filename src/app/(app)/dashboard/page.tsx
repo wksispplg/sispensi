@@ -6,6 +6,7 @@ import {
   ClipboardList,
   FilePlus2,
   History,
+  Timer,
   Users,
 } from "lucide-react";
 
@@ -15,6 +16,7 @@ import {
   ADMIN_SCHEDULES_PATH,
   APPROVAL_HISTORY_PATH,
   APPROVALS_PATH,
+  PEMANTAUAN_PATH,
   REKAP_PATH,
   ROLE_LABELS,
   ROLES,
@@ -54,6 +56,20 @@ function menuForRole(role: Role): MenuItem[] {
         },
       ];
     case ROLES.GURU_MAPEL:
+      return [
+        {
+          icon: ClipboardList,
+          title: "Perlu Persetujuan",
+          description: "Tinjau & putuskan pengajuan izin siswa.",
+          href: APPROVALS_PATH,
+        },
+        {
+          icon: History,
+          title: "Riwayat Keputusan",
+          description: "Lihat pengajuan yang pernah Anda proses.",
+          href: APPROVAL_HISTORY_PATH,
+        },
+      ];
     case ROLES.WALI_KELAS:
       return [
         {
@@ -61,6 +77,12 @@ function menuForRole(role: Role): MenuItem[] {
           title: "Perlu Persetujuan",
           description: "Tinjau & putuskan pengajuan izin siswa.",
           href: APPROVALS_PATH,
+        },
+        {
+          icon: Timer,
+          title: "Pemantauan Dispen",
+          description: "Pantau siswa kelas Anda yang sedang dispen keluar.",
+          href: PEMANTAUAN_PATH,
         },
         {
           icon: History,
@@ -76,6 +98,12 @@ function menuForRole(role: Role): MenuItem[] {
           title: "Perlu Persetujuan",
           description: "Tinjau pengajuan eskalasi tahap akhir.",
           href: APPROVALS_PATH,
+        },
+        {
+          icon: Timer,
+          title: "Pemantauan Dispen",
+          description: "Pantau seluruh siswa yang sedang dispen keluar.",
+          href: PEMANTAUAN_PATH,
         },
         {
           icon: History,
@@ -103,6 +131,12 @@ function menuForRole(role: Role): MenuItem[] {
           title: "Jadwal Pelajaran",
           description: "Kelola mata pelajaran & jadwal per kelas.",
           href: ADMIN_SCHEDULES_PATH,
+        },
+        {
+          icon: Timer,
+          title: "Pemantauan Dispen",
+          description: "Pantau seluruh siswa yang sedang dispen keluar.",
+          href: PEMANTAUAN_PATH,
         },
         {
           icon: BarChart3,

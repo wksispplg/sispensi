@@ -10,7 +10,12 @@ import {
   type CreateState,
   type LookupResult,
 } from "./actions";
-import { IZIN_TYPE_LABELS } from "@/lib/constants";
+import {
+  DISPEN_DURATION_OPTIONS,
+  IZIN_TYPE_LABELS,
+  isTimerIzin,
+  type IzinType,
+} from "@/lib/constants";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -74,6 +79,7 @@ export default function AjukanIzinPage() {
     initialState,
   );
 
+  const [izinType, setIzinType] = useState("");
   const [waktu, setWaktu] = useState("");
   const [preview, setPreview] = useState<LookupResult | null>(null);
   const [previewPending, startPreview] = useTransition();
@@ -110,7 +116,13 @@ export default function AjukanIzinPage() {
           <form action={formAction} className="flex flex-col gap-4">
             <div className="flex flex-col gap-2">
               <Label htmlFor="izin_type">Jenis izin</Label>
-              <SelectNative id="izin_type" name="izin_type" required defaultValue="">
+              <SelectNative
+                id="izin_type"
+                name="izin_type"
+                required
+                value={izinType}
+                onChange={(e) => setIzinType(e.target.value)}
+              >
                 <option value="" disabled>
                   Pilih jenis izin…
                 </option>
@@ -121,6 +133,31 @@ export default function AjukanIzinPage() {
                 ))}
               </SelectNative>
             </div>
+
+            {isTimerIzin(izinType as IzinType) ? (
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="duration_minutes">
+                  Perkiraan durasi keluar{" "}
+                  <span className="text-destructive">*</span>
+                </Label>
+                <SelectNative
+                  id="duration_minutes"
+                  name="duration_minutes"
+                  required
+                  defaultValue="30"
+                >
+                  {DISPEN_DURATION_OPTIONS.map((m) => (
+                    <option key={m} value={m}>
+                      {m} menit
+                    </option>
+                  ))}
+                </SelectNative>
+                <p className="text-muted-foreground text-xs">
+                  Hitung mundur mulai berjalan saat Anda menekan “Mulai Dispen”
+                  setelah izin disetujui.
+                </p>
+              </div>
+            ) : null}
 
             <div className="flex flex-col gap-2">
               <Label htmlFor="requested_at">Waktu izin</Label>
@@ -151,15 +188,19 @@ export default function AjukanIzinPage() {
             </div>
 
             <div className="flex flex-col gap-2">
-              <Label htmlFor="evidence">Bukti pendukung (opsional)</Label>
+              <Label htmlFor="evidence">
+                Bukti pendukung <span className="text-destructive">*</span>
+              </Label>
               <Input
                 id="evidence"
                 name="evidence"
                 type="file"
                 accept="image/jpeg,image/png,image/webp,application/pdf"
+                required
               />
               <p className="text-muted-foreground text-xs">
-                Gambar (JPG/PNG/WebP) atau PDF, maksimal 5MB.
+                Wajib dilampirkan untuk mencegah izin fiktif. Gambar
+                (JPG/PNG/WebP) atau PDF, maksimal 5MB.
               </p>
             </div>
 

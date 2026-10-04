@@ -13,9 +13,8 @@ import {
   STORAGE_BUCKETS,
   type ApprovalAction,
   type IzinType,
-  type RequestStatus,
 } from "@/lib/constants";
-import { StatusBadge } from "@/components/status-badge";
+import { RequestBadge } from "@/components/status-badge";
 import {
   Card,
   CardContent,
@@ -106,7 +105,7 @@ export default async function PersetujuanDetailPage({
                 {student?.nis ? ` · NIS ${student.nis}` : ""}
               </p>
             </div>
-            <StatusBadge status={req.status as RequestStatus} />
+            <RequestBadge req={req} />
           </div>
         </CardHeader>
         <CardContent className="flex flex-col gap-4 text-sm">
@@ -117,6 +116,9 @@ export default async function PersetujuanDetailPage({
           <Field label="Waktu izin">
             {dateFmt.format(new Date(req.requested_at))}
           </Field>
+          {req.duration_minutes ? (
+            <Field label="Durasi diminta">{req.duration_minutes} menit</Field>
+          ) : null}
           <Field label="Diajukan">
             {dateFmt.format(new Date(req.created_at))}
           </Field>

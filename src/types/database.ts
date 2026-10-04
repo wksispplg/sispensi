@@ -204,6 +204,10 @@ export type Database = {
           current_layer: number
           decided_at: string | null
           decided_by: string | null
+          dispen_deadline: string | null
+          dispen_started_at: string | null
+          duration_minutes: number | null
+          returned_at: string | null
           evidence_url: string | null
           id: string
           izin_type: Database["public"]["Enums"]["izin_type"]
@@ -222,6 +226,10 @@ export type Database = {
           current_layer?: number
           decided_at?: string | null
           decided_by?: string | null
+          dispen_deadline?: string | null
+          dispen_started_at?: string | null
+          duration_minutes?: number | null
+          returned_at?: string | null
           evidence_url?: string | null
           id?: string
           izin_type: Database["public"]["Enums"]["izin_type"]
@@ -240,6 +248,10 @@ export type Database = {
           current_layer?: number
           decided_at?: string | null
           decided_by?: string | null
+          dispen_deadline?: string | null
+          dispen_started_at?: string | null
+          duration_minutes?: number | null
+          returned_at?: string | null
           evidence_url?: string | null
           id?: string
           izin_type?: Database["public"]["Enums"]["izin_type"]
@@ -429,6 +441,8 @@ export type Database = {
         Returns: { approver_id: string; schedule_id: string }[]
       }
       escalate_overdue_requests: { Args: never; Returns: number }
+      start_dispen: { Args: { p_request: string }; Returns: string }
+      return_dispen: { Args: { p_request: string }; Returns: string }
       current_user_role: {
         Args: never
         Returns: Database["public"]["Enums"]["user_role"]

@@ -11,9 +11,8 @@ import {
   STORAGE_BUCKETS,
   type ApprovalAction,
   type IzinType,
-  type RequestStatus,
 } from "@/lib/constants";
-import { StatusBadge } from "@/components/status-badge";
+import { RequestBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -22,6 +21,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { CancelButton } from "./cancel-button";
+import { DispenControls } from "./dispen-controls";
+import { dispenPhase } from "@/lib/dispen";
 
 const dateFmt = new Intl.DateTimeFormat("id-ID", {
   dateStyle: "long",
@@ -74,6 +75,7 @@ export default async function DetailIzinPage({
 
   const isOwner = req.student_id === profile.id;
   const canCancel = isOwner && req.status === REQUEST_STATUS.PENDING;
+  const phase = dispenPhase(req);
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-4">
@@ -98,7 +100,7 @@ export default async function DetailIzinPage({
         <CardHeader>
           <div className="flex items-start justify-between gap-3">
             <CardTitle>{IZIN_TYPE_LABELS[req.izin_type as IzinType]}</CardTitle>
-            <StatusBadge status={req.status as RequestStatus} />
+            <RequestBadge req={req} />
           </div>
         </CardHeader>
         <CardContent className="flex flex-col gap-4 text-sm">
@@ -106,6 +108,9 @@ export default async function DetailIzinPage({
           <Field label="Waktu izin">
             {dateFmt.format(new Date(req.requested_at))}
           </Field>
+          {req.duration_minutes ? (
+            <Field label="Durasi dispen">{req.duration_minutes} menit</Field>
+          ) : null}
           <Field label="Diajukan">
             {dateFmt.format(new Date(req.created_at))}
           </Field>
@@ -157,6 +162,16 @@ export default async function DetailIzinPage({
           ) : null}
         </CardContent>
       </Card>
+
+      {isOwner && phase !== "none" ? (
+        <DispenControls
+          id={req.id}
+          phase={phase}
+          durationMinutes={req.duration_minutes}
+          dispenDeadline={req.dispen_deadline}
+          returnedAt={req.returned_at}
+        />
+      ) : null}
 
       <Card>
         <CardHeader>

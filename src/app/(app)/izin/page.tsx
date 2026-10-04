@@ -8,9 +8,8 @@ import {
   REQUEST_STATUS,
   ROLES,
   type IzinType,
-  type RequestStatus,
 } from "@/lib/constants";
-import { StatusBadge } from "@/components/status-badge";
+import { RequestBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -32,7 +31,7 @@ export default async function RiwayatIzinPage({
   const { data: requests } = await supabase
     .from("permission_requests")
     .select(
-      "id, izin_type, reason, status, current_layer, requested_at, created_at, evidence_url",
+      "id, izin_type, reason, status, current_layer, requested_at, created_at, evidence_url, duration_minutes, dispen_started_at, dispen_deadline, returned_at",
     )
     .eq("student_id", profile.id)
     .order("created_at", { ascending: false });
@@ -113,7 +112,7 @@ export default async function RiwayatIzinPage({
                         : ""}
                     </p>
                   </div>
-                  <StatusBadge status={r.status as RequestStatus} />
+                  <RequestBadge req={r} />
                   <ChevronRight className="text-muted-foreground size-4 shrink-0" />
                 </CardContent>
               </Card>

@@ -9,9 +9,12 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getProfile } from "@/lib/auth";
 import {
   DAY_LABELS,
+  DISPEN_MAX_MINUTES,
+  DISPEN_MIN_MINUTES,
   IZIN_TYPES,
   ROLES,
   STORAGE_BUCKETS,
+  isTimerIzin,
   type IzinType,
 } from "@/lib/constants";
 
@@ -32,6 +35,12 @@ const requestSchema = z.object({
     .min(5, "Alasan minimal 5 karakter")
     .max(1000, "Alasan maksimal 1000 karakter"),
   requested_at: z.string().trim().optional(),
+  duration_minutes: z.coerce
+    .number()
+    .int()
+    .min(DISPEN_MIN_MINUTES, `Durasi minimal ${DISPEN_MIN_MINUTES} menit`)
+    .max(DISPEN_MAX_MINUTES, `Durasi maksimal ${DISPEN_MAX_MINUTES} menit`)
+    .optional(),
 });
 
 export type CreateState = { error?: string };
@@ -50,37 +59,41 @@ export async function createPermissionRequest(
     izin_type: formData.get("izin_type"),
     reason: formData.get("reason"),
     requested_at: formData.get("requested_at") || undefined,
+    duration_minutes: formData.get("duration_minutes") || undefined,
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Input tidak valid." };
   }
 
+  // Durasi wajib untuk jenis izin ber-timer (keluar_sementara / dispensasi).
+  const useTimer = isTimerIzin(parsed.data.izin_type);
+  if (useTimer && parsed.data.duration_minutes == null) {
+    return {
+      error: "Perkiraan durasi wajib untuk izin Keluar Sementara / Dispensasi.",
+    };
+  }
+
   const supabase = await createClient();
 
-  // Upload bukti (opsional)
-  let evidencePath: string | null = null;
+  // Upload bukti (WAJIB — antisipasi izin fiktif / siswa berbohong).
   const file = formData.get("evidence");
-  if (file instanceof File && file.size > 0) {
-    if (file.size > MAX_EVIDENCE_BYTES) {
-      return { error: "Ukuran bukti maksimal 5MB." };
-    }
-    if (!ALLOWED_EVIDENCE_TYPES.includes(file.type)) {
-      return {
-        error: "Bukti harus berupa gambar (JPG/PNG/WebP) atau PDF.",
-      };
-    }
-    const ext = file.name.includes(".")
-      ? `.${file.name.split(".").pop()}`
-      : "";
-    // Konvensi path: "<user_id>/<uuid>.<ext>" (folder pertama = pemilik, sesuai policy Storage)
-    const path = `${profile.id}/${crypto.randomUUID()}${ext}`;
-    const { error: uploadError } = await supabase.storage
-      .from(STORAGE_BUCKETS.EVIDENCE)
-      .upload(path, file, { contentType: file.type, upsert: false });
-    if (uploadError) {
-      return { error: `Gagal mengunggah bukti: ${uploadError.message}` };
-    }
-    evidencePath = path;
+  if (!(file instanceof File) || file.size === 0) {
+    return { error: "Bukti pendukung wajib dilampirkan." };
+  }
+  if (file.size > MAX_EVIDENCE_BYTES) {
+    return { error: "Ukuran bukti maksimal 5MB." };
+  }
+  if (!ALLOWED_EVIDENCE_TYPES.includes(file.type)) {
+    return { error: "Bukti harus berupa gambar (JPG/PNG/WebP) atau PDF." };
+  }
+  const ext = file.name.includes(".") ? `.${file.name.split(".").pop()}` : "";
+  // Konvensi path: "<user_id>/<uuid>.<ext>" (folder pertama = pemilik, sesuai policy Storage)
+  const evidencePath = `${profile.id}/${crypto.randomUUID()}${ext}`;
+  const { error: uploadError } = await supabase.storage
+    .from(STORAGE_BUCKETS.EVIDENCE)
+    .upload(evidencePath, file, { contentType: file.type, upsert: false });
+  if (uploadError) {
+    return { error: `Gagal mengunggah bukti: ${uploadError.message}` };
   }
 
   const requestedAt = parsed.data.requested_at
@@ -98,6 +111,7 @@ export async function createPermissionRequest(
       reason: parsed.data.reason,
       requested_at: requestedAt,
       evidence_url: evidencePath,
+      duration_minutes: useTimer ? parsed.data.duration_minutes : null,
     });
 
   if (insertError) {

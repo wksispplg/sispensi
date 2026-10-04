@@ -134,12 +134,50 @@ export const IZIN_TYPE_LABELS: Record<IzinType, string> = {
 };
 
 // ========================================================================
+// Timer / Countdown Dispen (fitur pemantauan izin keluar)
+// Hanya jenis "kembali ke sekolah" yang memakai timer durasi.
+// ========================================================================
+export const TIMER_IZIN_TYPES: readonly IzinType[] = [
+  IZIN_TYPES.KELUAR_SEMENTARA,
+  IZIN_TYPES.DISPENSASI,
+];
+
+export function isTimerIzin(type: IzinType): boolean {
+  return TIMER_IZIN_TYPES.includes(type);
+}
+
+/** Pilihan durasi dispen (menit) untuk siswa saat mengajukan. */
+export const DISPEN_DURATION_OPTIONS = [10, 15, 20, 30, 45, 60, 90, 120] as const;
+export const DISPEN_MIN_MINUTES = 5;
+export const DISPEN_MAX_MINUTES = 240;
+
+/** Fase dispen — DIHITUNG dari timestamp pengajuan, bukan nilai enum status. */
+export const DISPEN_PHASE = {
+  NONE: "none",
+  READY: "ready", // sudah disetujui, belum menekan "Mulai Dispen"
+  ACTIVE: "active", // sedang di luar, hitung mundur berjalan
+  OVERDUE: "overdue", // lewat batas, belum lapor kembali
+  RETURNED: "returned", // sudah lapor kembali ke sekolah
+} as const;
+
+export type DispenPhase = (typeof DISPEN_PHASE)[keyof typeof DISPEN_PHASE];
+
+export const DISPEN_PHASE_LABELS: Record<DispenPhase, string> = {
+  none: "",
+  ready: "Siap Dispen",
+  active: "Sedang Dispen",
+  overdue: "Terlambat Kembali",
+  returned: "Sudah Kembali",
+};
+
+// ========================================================================
 // Rute aplikasi
 // ========================================================================
 export const LOGIN_PATH = "/login";
 export const DASHBOARD_PATH = "/dashboard";
 export const APPROVALS_PATH = "/persetujuan";
 export const APPROVAL_HISTORY_PATH = "/riwayat-keputusan";
+export const PEMANTAUAN_PATH = "/pemantauan";
 export const REKAP_PATH = "/rekap";
 export const ADMIN_HOME_PATH = "/admin";
 export const ADMIN_CLASSES_PATH = "/admin/kelas";
