@@ -2,7 +2,7 @@ import type { ComponentProps } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { REQUEST_STATUS_LABELS, type RequestStatus } from "@/lib/constants";
-import { dispenPhase, type DispenFields } from "@/lib/dispen";
+import { dispenPhase, type DispenFields } from "@/features/dispen/phase";
 
 const STATUS_VARIANT: Record<
   RequestStatus,

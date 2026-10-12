@@ -7,7 +7,7 @@ import { ChevronRight } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { formatRemaining } from "@/lib/dispen";
+import { formatRemaining } from "@/features/dispen/phase";
 
 type Item = {
   id: string;
@@ -68,7 +68,7 @@ export function MonitorList({ items }: { items: Item[] }) {
                 </div>
                 <div className="text-right">
                   <p className="text-muted-foreground text-[11px]">
-                    {overdue ? "Terlambat" : "Sisa waktu"}
+                    {overdue ? "Melewati batas" : "Sisa waktu"}
                   </p>
                   <p
                     className={`font-mono text-lg font-semibold tabular-nums ${
@@ -79,7 +79,7 @@ export function MonitorList({ items }: { items: Item[] }) {
                   </p>
                 </div>
                 {overdue ? (
-                  <Badge variant="destructive">Overdue</Badge>
+                  <Badge variant="destructive">Terlambat</Badge>
                 ) : (
                   <Badge variant="warning">Dispen</Badge>
                 )}

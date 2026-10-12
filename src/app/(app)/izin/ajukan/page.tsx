@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { ArrowLeft, CalendarClock } from "lucide-react";
 
@@ -12,10 +12,13 @@ import {
 } from "./actions";
 import {
   DISPEN_DURATION_OPTIONS,
+  EVIDENCE_MAX_BYTES,
+  EVIDENCE_MIME_TYPES,
   IZIN_TYPE_LABELS,
   isTimerIzin,
   type IzinType,
 } from "@/lib/constants";
+import { useFormAction } from "@/hooks/use-form-action";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -40,7 +43,7 @@ function SchedulePreview({
 }) {
   return (
     <div className="bg-muted/30 rounded-md border border-dashed px-3 py-2 text-sm">
-      {!preview && pending ? (
+      {!preview || pending ? (
         <p className="text-muted-foreground">Memuat jadwal…</p>
       ) : preview?.status === "found" ? (
         <div className="flex items-start gap-2">
@@ -74,13 +77,14 @@ function SchedulePreview({
 }
 
 export default function AjukanIzinPage() {
-  const [state, formAction, pending] = useActionState(
+  const [state, formProps, pending] = useFormAction(
     createPermissionRequest,
     initialState,
   );
 
   const [izinType, setIzinType] = useState("");
   const [waktu, setWaktu] = useState("");
+  const [fileError, setFileError] = useState<string | null>(null);
   const [preview, setPreview] = useState<LookupResult | null>(null);
   const [previewPending, startPreview] = useTransition();
 
@@ -113,7 +117,7 @@ export default function AjukanIzinPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form action={formAction} className="flex flex-col gap-4">
+          <form {...formProps} className="flex flex-col gap-4">
             <div className="flex flex-col gap-2">
               <Label htmlFor="izin_type">Jenis izin</Label>
               <SelectNative
@@ -195,10 +199,30 @@ export default function AjukanIzinPage() {
                 id="evidence"
                 name="evidence"
                 type="file"
-                accept="image/jpeg,image/png,image/webp,application/pdf"
+                accept={EVIDENCE_MIME_TYPES.join(",")}
                 required
+                aria-invalid={fileError ? true : undefined}
+                aria-describedby="evidence-hint"
+                onChange={(e) => {
+                  // Cek di browser dulu agar file besar tidak sempat diunggah.
+                  const f = e.currentTarget.files?.[0];
+                  const msg = !f
+                    ? ""
+                    : f.size > EVIDENCE_MAX_BYTES
+                      ? `Ukuran file ${(f.size / 1048576).toFixed(1)}MB — maksimal 5MB.`
+                      : !EVIDENCE_MIME_TYPES.includes(f.type)
+                        ? "Format harus JPG, PNG, WebP, atau PDF."
+                        : "";
+                  e.currentTarget.setCustomValidity(msg);
+                  setFileError(msg || null);
+                }}
               />
-              <p className="text-muted-foreground text-xs">
+              {fileError ? (
+                <p role="alert" className="text-destructive text-sm">
+                  {fileError}
+                </p>
+              ) : null}
+              <p id="evidence-hint" className="text-muted-foreground text-xs">
                 Wajib dilampirkan untuk mencegah izin fiktif. Gambar
                 (JPG/PNG/WebP) atau PDF, maksimal 5MB.
               </p>

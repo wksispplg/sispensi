@@ -6,7 +6,8 @@ import { GraduationCap } from "lucide-react";
 import { getProfile, getSessionUser } from "@/lib/auth";
 import { DASHBOARD_PATH, LOGIN_PATH, ROLE_LABELS } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
-import { NotificationBell } from "@/components/notification-bell";
+import { NotificationBell } from "@/components/layout/notification-bell";
+import { DesktopNav, MobileNav } from "@/components/layout/app-nav";
 import {
   Card,
   CardContent,
@@ -30,9 +31,11 @@ export default async function AppLayout({
   return (
     <div className="flex min-h-svh flex-1 flex-col">
       <AppHeader profile={profile} />
-      <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 sm:px-6">
+      {/* pb-24 di HP agar konten tidak tertutup navigasi bawah */}
+      <main className="mx-auto w-full max-w-5xl flex-1 px-4 pt-6 pb-24 sm:px-6 lg:pb-6">
         {children}
       </main>
+      <MobileNav role={profile.role} />
     </div>
   );
 }
@@ -56,6 +59,7 @@ function AppHeader({ profile }: { profile: Profile }) {
             </p>
           </div>
         </Link>
+        <DesktopNav role={profile.role} />
         <div className="flex items-center gap-1.5 sm:gap-3">
           <NotificationBell userId={profile.id} role={profile.role} />
           <div className="hidden text-right leading-tight sm:block">

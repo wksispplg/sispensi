@@ -18,8 +18,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { DeleteButton } from "@/components/delete-button";
-import { InlineSelect } from "@/components/inline-select";
+import { DeleteButton } from "@/components/common/delete-button";
+import { InlineSelect } from "@/components/common/inline-select";
 import { GuruForm } from "./guru-form";
 import { ImportForm } from "./import-form";
 import { deleteUser, setUserRole } from "./actions";
@@ -73,7 +73,7 @@ export default async function AdminGuruPage() {
         <CardContent className="flex flex-col gap-3">
           <ImportForm />
           <a
-            href="/template-import-guru.csv"
+            href="/templates/import-guru.csv"
             download
             className="text-primary inline-flex w-fit items-center gap-1 text-sm hover:underline"
           >

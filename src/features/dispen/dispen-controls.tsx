@@ -5,13 +5,13 @@ import { useRouter } from "next/navigation";
 import { Clock, LogIn, LogOut } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { formatRemaining } from "@/lib/dispen";
+import { formatRemaining } from "@/features/dispen/phase";
 import type { DispenPhase } from "@/lib/constants";
 import {
   returnDispenAction,
   startDispenAction,
   type DispenActionState,
-} from "./actions";
+} from "@/features/dispen/actions";
 
 type Props = {
   id: string;
@@ -94,12 +94,12 @@ export function DispenControls(props: Props) {
       className={`flex flex-col items-start gap-3 rounded-md border px-4 py-4 ${
         overdue
           ? "border-destructive/40 bg-destructive/5"
-          : "border-primary/30 bg-primary/5"
+          : "border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/40"
       }`}
     >
       <div className="flex items-center gap-3">
         <Clock
-          className={overdue ? "text-destructive size-6" : "text-primary size-6"}
+          className={overdue ? "text-destructive size-6" : "size-6 text-amber-600 dark:text-amber-400"}
         />
         <div>
           <p className="text-muted-foreground text-xs">

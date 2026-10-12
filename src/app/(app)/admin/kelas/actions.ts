@@ -19,7 +19,8 @@ export async function createClass(
 ): Promise<FormState> {
   if (!(await isAdmin())) return { error: "Hanya admin." };
 
-  const name = String(formData.get("name") ?? "").trim();
+  // Spasi ganda dirapikan; keunikan nama dijaga DB tanpa beda huruf besar/kecil.
+  const name = String(formData.get("name") ?? "").replace(/s+/g, " ").trim();
   const gradeRaw = String(formData.get("grade_level") ?? "").trim();
   const major = String(formData.get("major") ?? "").trim();
 

@@ -8,13 +8,14 @@ import { getProfile } from "@/lib/auth";
 import {
   APPROVAL_ACTION_LABELS,
   IZIN_TYPE_LABELS,
+  AUTO_REJECT_HOURS,
   REQUEST_STATUS,
   ROLES,
   STORAGE_BUCKETS,
   type ApprovalAction,
   type IzinType,
 } from "@/lib/constants";
-import { RequestBadge } from "@/components/status-badge";
+import { RequestBadge } from "@/features/izin/status-badge";
 import {
   Card,
   CardContent,
@@ -123,7 +124,18 @@ export default async function PersetujuanDetailPage({
             {dateFmt.format(new Date(req.created_at))}
           </Field>
           {req.status === REQUEST_STATUS.PENDING ? (
-            <Field label="Tahap">Lapis {req.current_layer}</Field>
+            <>
+              <Field label="Tahap">Lapis {req.current_layer}</Field>
+              <Field label="Batas keputusan">
+                {dateFmt.format(
+                  new Date(
+                    new Date(req.created_at).getTime() +
+                      AUTO_REJECT_HOURS * 3600_000,
+                  ),
+                )}{" "}
+                — lewat dari itu, sistem menolak otomatis.
+              </Field>
+            </>
           ) : null}
           {req.evidence_url ? (
             <Field label="Bukti pendukung">

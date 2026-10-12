@@ -7,12 +7,13 @@ import { getProfile } from "@/lib/auth";
 import {
   APPROVAL_ACTION_LABELS,
   IZIN_TYPE_LABELS,
+  AUTO_REJECT_HOURS,
   REQUEST_STATUS,
   STORAGE_BUCKETS,
   type ApprovalAction,
   type IzinType,
 } from "@/lib/constants";
-import { RequestBadge } from "@/components/status-badge";
+import { RequestBadge } from "@/features/izin/status-badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -21,8 +22,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { CancelButton } from "./cancel-button";
-import { DispenControls } from "./dispen-controls";
-import { dispenPhase } from "@/lib/dispen";
+import { DispenControls } from "@/features/dispen/dispen-controls";
+import { dispenPhase } from "@/features/dispen/phase";
 
 const dateFmt = new Intl.DateTimeFormat("id-ID", {
   dateStyle: "long",
@@ -115,7 +116,18 @@ export default async function DetailIzinPage({
             {dateFmt.format(new Date(req.created_at))}
           </Field>
           {req.status === REQUEST_STATUS.PENDING ? (
-            <Field label="Menunggu">Persetujuan Lapis {req.current_layer}</Field>
+            <>
+              <Field label="Menunggu">Persetujuan Lapis {req.current_layer}</Field>
+              <Field label="Batas tanggapan">
+                {dateFmt.format(
+                  new Date(
+                    new Date(req.created_at).getTime() +
+                      AUTO_REJECT_HOURS * 3600_000,
+                  ),
+                )}{" "}
+                — bila belum ditanggapi, pengajuan otomatis ditolak.
+              </Field>
+            </>
           ) : null}
           {req.decided_at ? (
             <Field label="Diputuskan">

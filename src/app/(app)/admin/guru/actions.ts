@@ -12,7 +12,7 @@ import {
   ROLES,
   type Role,
 } from "@/lib/constants";
-import { parseSheet, pickField } from "@/lib/import";
+import { parseSheet, pickField } from "@/features/data-master/spreadsheet";
 
 export type FormState = { error?: string; ok?: boolean };
 export type ImportState = {

@@ -9,9 +9,8 @@ import {
   IZIN_TYPE_LABELS,
   ROLES,
   type IzinType,
-  type RequestStatus,
 } from "@/lib/constants";
-import { StatusBadge } from "@/components/status-badge";
+import { RequestBadge } from "@/features/izin/status-badge";
 import { Card, CardContent } from "@/components/ui/card";
 
 const dateFmt = new Intl.DateTimeFormat("id-ID", {
@@ -28,7 +27,7 @@ export default async function RiwayatKeputusanPage() {
   const { data: requests } = await supabase
     .from("permission_requests")
     .select(
-      "id, izin_type, reason, status, decided_at, student_id, class_id",
+      "id, izin_type, reason, status, decided_at, student_id, class_id, duration_minutes, dispen_started_at, dispen_deadline, returned_at",
     )
     .eq("decided_by", profile.id)
     .order("decided_at", { ascending: false });
@@ -102,7 +101,7 @@ export default async function RiwayatKeputusanPage() {
                         </p>
                       ) : null}
                     </div>
-                    <StatusBadge status={r.status as RequestStatus} />
+                    <RequestBadge req={r} />
                     <ChevronRight className="text-muted-foreground size-4 shrink-0" />
                   </CardContent>
                 </Card>

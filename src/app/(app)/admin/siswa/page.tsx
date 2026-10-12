@@ -12,7 +12,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { DeleteButton } from "@/components/delete-button";
+import { DeleteButton } from "@/components/common/delete-button";
 import { SiswaForm } from "./siswa-form";
 import { ImportForm } from "./import-form";
 import { deleteStudent } from "./actions";
@@ -71,7 +71,7 @@ export default async function AdminSiswaPage() {
         <CardContent className="flex flex-col gap-3">
           <ImportForm />
           <a
-            href="/template-import-siswa.csv"
+            href="/templates/import-siswa.csv"
             download
             className="text-primary inline-flex w-fit items-center gap-1 text-sm hover:underline"
           >

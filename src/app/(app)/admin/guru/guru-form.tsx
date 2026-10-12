@@ -1,8 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
-
 import { createTeacher, type FormState } from "./actions";
+import { useFormAction } from "@/hooks/use-form-action";
 import { ROLE_LABELS, ROLES } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,13 +12,13 @@ const initialState: FormState = {};
 const roleOptions = [ROLES.GURU_MAPEL, ROLES.WALI_KELAS, ROLES.GURU_BK];
 
 export function GuruForm() {
-  const [state, formAction, pending] = useActionState(
+  const [state, formProps, pending] = useFormAction(
     createTeacher,
     initialState,
   );
 
   return (
-    <form action={formAction} className="flex flex-col gap-3">
+    <form {...formProps} className="flex flex-col gap-3">
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="flex flex-col gap-2">
           <Label htmlFor="full_name">Nama</Label>

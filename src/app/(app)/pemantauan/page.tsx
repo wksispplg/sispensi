@@ -7,8 +7,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import { MonitorList } from "./monitor-list";
 
 export default async function PemantauanPage() {
-  // Hanya Wali Kelas, Guru BK, & Admin (RLS otomatis membatasi Wali ke kelasnya).
-  await requireRole(ROLES.WALI_KELAS, ROLES.GURU_BK, ROLES.ADMIN);
+  // Semua guru, BK & Admin. RLS membatasi isi: Guru/Wali hanya melihat siswa
+  // yang ia setujui atau kelas perwaliannya; BK & Admin melihat semua.
+  await requireRole(
+    ROLES.GURU_MAPEL,
+    ROLES.WALI_KELAS,
+    ROLES.GURU_BK,
+    ROLES.ADMIN,
+  );
 
   const supabase = await createClient();
   const { data: rows } = await supabase
@@ -55,7 +61,7 @@ export default async function PemantauanPage() {
         </h1>
         <p className="text-muted-foreground">
           Siswa yang sedang dispen keluar sekolah. Baris merah = terlambat
-          kembali (overdue).
+          kembali.
         </p>
       </div>
 

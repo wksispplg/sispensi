@@ -1,22 +1,22 @@
 "use client";
 
-import { useActionState } from "react";
 import { Upload } from "lucide-react";
 
 import { importStudents, type ImportState } from "./actions";
+import { useFormAction } from "@/hooks/use-form-action";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 const initialState: ImportState = {};
 
 export function ImportForm() {
-  const [state, formAction, pending] = useActionState(
+  const [state, formProps, pending] = useFormAction(
     importStudents,
     initialState,
   );
 
   return (
-    <form action={formAction} className="flex flex-col gap-3">
+    <form {...formProps} className="flex flex-col gap-3">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
         <Input
           type="file"

@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/card";
 import { SubjectForm } from "./subject-form";
 import { ScheduleForm } from "./schedule-form";
-import { DeleteButton } from "./delete-button";
+import { DeleteButton } from "@/components/common/delete-button";
 import { deleteSchedule, deleteSubject } from "./actions";
 
 function hhmm(t: string) {

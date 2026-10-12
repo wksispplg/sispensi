@@ -11,7 +11,11 @@ import {
   DAY_LABELS,
   DISPEN_MAX_MINUTES,
   DISPEN_MIN_MINUTES,
+  EVIDENCE_MAX_BYTES,
+  EVIDENCE_MIME_TYPES,
   IZIN_TYPES,
+  IZIN_TYPE_LABELS,
+  REQUEST_STATUS,
   ROLES,
   STORAGE_BUCKETS,
   isTimerIzin,
@@ -19,13 +23,6 @@ import {
 } from "@/lib/constants";
 
 const IZIN_VALUES = Object.values(IZIN_TYPES) as [IzinType, ...IzinType[]];
-const MAX_EVIDENCE_BYTES = 5 * 1024 * 1024; // 5MB
-const ALLOWED_EVIDENCE_TYPES = [
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "application/pdf",
-];
 
 const requestSchema = z.object({
   izin_type: z.enum(IZIN_VALUES, { error: "Jenis izin tidak valid" }),
@@ -75,15 +72,28 @@ export async function createPermissionRequest(
 
   const supabase = await createClient();
 
+  // Cegah pengajuan dobel: satu pengajuan menunggu per jenis izin. Dicek di sini
+  // agar bukti tidak sempat diunggah; DB juga menjaganya (migrasi 0012).
+  const duplicateMsg = `Masih ada pengajuan "${IZIN_TYPE_LABELS[parsed.data.izin_type]}" yang menunggu persetujuan. Tunggu keputusannya atau batalkan dulu di menu Riwayat.`;
+  const { data: pendingSame } = await supabase
+    .from("permission_requests")
+    .select("id")
+    .eq("student_id", profile.id)
+    .eq("izin_type", parsed.data.izin_type)
+    .eq("status", REQUEST_STATUS.PENDING)
+    .limit(1)
+    .maybeSingle();
+  if (pendingSame) return { error: duplicateMsg };
+
   // Upload bukti (WAJIB — antisipasi izin fiktif / siswa berbohong).
   const file = formData.get("evidence");
   if (!(file instanceof File) || file.size === 0) {
     return { error: "Bukti pendukung wajib dilampirkan." };
   }
-  if (file.size > MAX_EVIDENCE_BYTES) {
+  if (file.size > EVIDENCE_MAX_BYTES) {
     return { error: "Ukuran bukti maksimal 5MB." };
   }
-  if (!ALLOWED_EVIDENCE_TYPES.includes(file.type)) {
+  if (!EVIDENCE_MIME_TYPES.includes(file.type)) {
     return { error: "Bukti harus berupa gambar (JPG/PNG/WebP) atau PDF." };
   }
   const ext = file.name.includes(".") ? `.${file.name.split(".").pop()}` : "";
@@ -121,6 +131,8 @@ export async function createPermissionRequest(
         .from(STORAGE_BUCKETS.EVIDENCE)
         .remove([evidencePath]);
     }
+    // 23505 = dua pengajuan dikirim bersamaan (mis. dari dua tab).
+    if (insertError.code === "23505") return { error: duplicateMsg };
     return { error: `Gagal menyimpan pengajuan: ${insertError.message}` };
   }
 

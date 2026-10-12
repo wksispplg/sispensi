@@ -1,8 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
-
 import { createSchedule, type FormState } from "./actions";
+import { useFormAction } from "@/hooks/use-form-action";
 import { DAY_LABELS } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,7 +21,7 @@ export function ScheduleForm({
   subjects: Option[];
   teachers: Option[];
 }) {
-  const [state, formAction, pending] = useActionState(
+  const [state, formProps, pending] = useFormAction(
     createSchedule,
     initialState,
   );
@@ -57,7 +56,7 @@ export function ScheduleForm({
   }
 
   return (
-    <form action={formAction} className="grid gap-3 sm:grid-cols-2">
+    <form {...formProps} className="grid gap-3 sm:grid-cols-2">
       <div className="flex flex-col gap-2">
         <Label htmlFor="class_id">Kelas</Label>
         <SelectNative id="class_id" name="class_id" required defaultValue="">

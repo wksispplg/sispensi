@@ -1,21 +1,20 @@
 "use client";
 
-import { useActionState } from "react";
-
 import { createSubject, type FormState } from "./actions";
+import { useFormAction } from "@/hooks/use-form-action";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 const initialState: FormState = {};
 
 export function SubjectForm() {
-  const [state, formAction, pending] = useActionState(
+  const [state, formProps, pending] = useFormAction(
     createSubject,
     initialState,
   );
 
   return (
-    <form action={formAction} className="flex flex-col gap-2">
+    <form {...formProps} className="flex flex-col gap-2">
       <div className="flex flex-col gap-2 sm:flex-row">
         <Input
           name="name"

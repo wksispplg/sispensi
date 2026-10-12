@@ -10,8 +10,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { DeleteButton } from "@/components/delete-button";
-import { InlineSelect } from "@/components/inline-select";
+import { DeleteButton } from "@/components/common/delete-button";
+import { InlineSelect } from "@/components/common/inline-select";
 import { ClassForm } from "./class-form";
 import { deleteClass, setHomeroom } from "./actions";
 

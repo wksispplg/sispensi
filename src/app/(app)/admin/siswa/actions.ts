@@ -6,7 +6,7 @@ import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getProfile } from "@/lib/auth";
 import { ADMIN_STUDENTS_PATH, ROLES } from "@/lib/constants";
-import { parseSheet, pickField } from "@/lib/import";
+import { parseSheet, pickField } from "@/features/data-master/spreadsheet";
 
 export type FormState = { error?: string; ok?: boolean };
 export type ImportState = {
@@ -115,8 +115,11 @@ export async function importStudents(
 
   const admin = createAdminClient();
   const { data: classes } = await admin.from("classes").select("id, name");
+  // Kunci dinormalisasi sama seperti unique index DB (migrasi 0012):
+  // huruf kecil + spasi dirapikan, agar "XI  rpl 1" cocok dengan "XI RPL 1".
+  const normClass = (s: string) => s.replace(/s+/g, " ").trim().toLowerCase();
   const classByName = new Map(
-    (classes ?? []).map((c) => [c.name.trim().toLowerCase(), c.id] as const),
+    (classes ?? []).map((c) => [normClass(c.name), c.id] as const),
   );
 
   let created = 0;
@@ -143,18 +146,23 @@ export async function importStudents(
 
     let classId: string | null = null;
     if (kelas) {
-      const key = kelas.toLowerCase();
+      const key = normClass(kelas);
       classId = classByName.get(key) ?? null;
       if (!classId) {
         const { data: nc } = await admin
           .from("classes")
-          .insert({ name: kelas })
+          .insert({ name: kelas.replace(/s+/g, " ").trim() })
           .select("id")
           .maybeSingle();
         if (nc) {
           classId = nc.id;
           classByName.set(key, nc.id);
         }
+      }
+      // Jangan buat siswa tanpa kelas diam-diam — izinnya tak akan terarah.
+      if (!classId) {
+        errors.push(`Baris ${line}: kelas "${kelas}" gagal dibuat/ditemukan.`);
+        continue;
       }
     }
 

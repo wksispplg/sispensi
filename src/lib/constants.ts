@@ -216,3 +216,18 @@ export const STORAGE_BUCKETS = {
 
 export type StorageBucket =
   (typeof STORAGE_BUCKETS)[keyof typeof STORAGE_BUCKETS];
+
+/** Batas berkas bukti pendukung — dipakai validasi di browser & di server. */
+export const EVIDENCE_MAX_BYTES = 5 * 1024 * 1024; // 5MB
+export const EVIDENCE_MIME_TYPES: readonly string[] = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "application/pdf",
+];
+
+/**
+ * Pengajuan yang tidak ditanggapi lebih dari durasi ini (sejak diajukan)
+ * ditolak otomatis oleh job terjadwal. HARUS sama dengan migrasi 0009.
+ */
+export const AUTO_REJECT_HOURS = 24;

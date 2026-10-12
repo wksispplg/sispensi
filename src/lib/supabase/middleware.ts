@@ -54,7 +54,9 @@ export async function updateSession(request: NextRequest) {
   if (!user && !isPublicPath(pathname)) {
     const url = request.nextUrl.clone();
     url.pathname = LOGIN_PATH;
-    url.searchParams.set("redirectedFrom", pathname);
+    url.search = "";
+    // Simpan tujuan awal (termasuk query) agar setelah login kembali ke sana.
+    url.searchParams.set("redirectedFrom", pathname + request.nextUrl.search);
     return NextResponse.redirect(url);
   }
 

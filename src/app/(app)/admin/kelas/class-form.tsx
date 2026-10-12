@@ -1,8 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
-
 import { createClass, type FormState } from "./actions";
+import { useFormAction } from "@/hooks/use-form-action";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,13 +9,13 @@ import { Label } from "@/components/ui/label";
 const initialState: FormState = {};
 
 export function ClassForm() {
-  const [state, formAction, pending] = useActionState(
+  const [state, formProps, pending] = useFormAction(
     createClass,
     initialState,
   );
 
   return (
-    <form action={formAction} className="flex flex-col gap-3">
+    <form {...formProps} className="flex flex-col gap-3">
       <div className="grid gap-3 sm:grid-cols-[1fr_8rem_1fr]">
         <div className="flex flex-col gap-2">
           <Label htmlFor="name">Nama kelas</Label>

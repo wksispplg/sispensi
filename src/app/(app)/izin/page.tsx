@@ -9,7 +9,7 @@ import {
   ROLES,
   type IzinType,
 } from "@/lib/constants";
-import { RequestBadge } from "@/components/status-badge";
+import { RequestBadge } from "@/features/izin/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 

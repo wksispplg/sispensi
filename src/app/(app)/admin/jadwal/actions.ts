@@ -48,7 +48,15 @@ export async function createSchedule(
 
   const supabase = await createClient();
   const { error } = await supabase.from("schedules").insert(parsed.data);
-  if (error) return { error: error.message };
+  if (error) {
+    // 23P01 = melanggar constraint schedules_no_overlap (migrasi 0012).
+    return {
+      error:
+        error.code === "23P01"
+          ? "Jadwal bentrok: kelas ini sudah punya pelajaran yang jamnya tumpang tindih pada hari tersebut."
+          : error.message,
+    };
+  }
 
   revalidatePath(ADMIN_SCHEDULES_PATH);
   return { ok: true };
@@ -76,7 +84,10 @@ export async function createSubject(
   const supabase = await createClient();
   const { error } = await supabase
     .from("subjects")
-    .insert({ name: parsed.data.name, code: parsed.data.code || null });
+    .insert({
+      name: parsed.data.name.replace(/s+/g, " "),
+      code: parsed.data.code || null,
+    });
   if (error) {
     return {
       error: error.code === "23505" ? "Mata pelajaran sudah ada." : error.message,

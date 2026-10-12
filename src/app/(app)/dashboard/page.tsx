@@ -1,154 +1,26 @@
 import Link from "next/link";
-import type { LucideIcon } from "lucide-react";
-import {
-  BarChart3,
-  CalendarClock,
-  ClipboardList,
-  FilePlus2,
-  History,
-  Timer,
-  Users,
-} from "lucide-react";
+import { ChevronRight } from "lucide-react";
 
 import { getProfile } from "@/lib/auth";
+import { createClient } from "@/lib/supabase/server";
 import {
-  ADMIN_HOME_PATH,
-  ADMIN_SCHEDULES_PATH,
-  APPROVAL_HISTORY_PATH,
-  APPROVALS_PATH,
-  PEMANTAUAN_PATH,
-  REKAP_PATH,
+  DASHBOARD_PATH,
+  IZIN_TYPE_LABELS,
+  REQUEST_STATUS,
   ROLE_LABELS,
   ROLES,
-  type Role,
+  type IzinType,
 } from "@/lib/constants";
-import { cn } from "@/lib/utils";
+import { dispenPhase } from "@/features/dispen/phase";
+import { navItemsForRole } from "@/lib/navigation";
+import { DispenControls } from "@/features/dispen/dispen-controls";
 import {
   Card,
+  CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-
-type MenuItem = {
-  icon: LucideIcon;
-  title: string;
-  description: string;
-  href?: string; // bila ada -> tile aktif (bukan "Segera")
-};
-
-/** Modul yang relevan per peran. */
-function menuForRole(role: Role): MenuItem[] {
-  switch (role) {
-    case ROLES.SISWA:
-      return [
-        {
-          icon: FilePlus2,
-          title: "Ajukan Izin",
-          description: "Buat pengajuan izin baru secara digital.",
-          href: "/izin/ajukan",
-        },
-        {
-          icon: History,
-          title: "Riwayat Pengajuan",
-          description: "Pantau status & unduh surat izin Anda.",
-          href: "/izin",
-        },
-      ];
-    case ROLES.GURU_MAPEL:
-      return [
-        {
-          icon: ClipboardList,
-          title: "Perlu Persetujuan",
-          description: "Tinjau & putuskan pengajuan izin siswa.",
-          href: APPROVALS_PATH,
-        },
-        {
-          icon: History,
-          title: "Riwayat Keputusan",
-          description: "Lihat pengajuan yang pernah Anda proses.",
-          href: APPROVAL_HISTORY_PATH,
-        },
-      ];
-    case ROLES.WALI_KELAS:
-      return [
-        {
-          icon: ClipboardList,
-          title: "Perlu Persetujuan",
-          description: "Tinjau & putuskan pengajuan izin siswa.",
-          href: APPROVALS_PATH,
-        },
-        {
-          icon: Timer,
-          title: "Pemantauan Dispen",
-          description: "Pantau siswa kelas Anda yang sedang dispen keluar.",
-          href: PEMANTAUAN_PATH,
-        },
-        {
-          icon: History,
-          title: "Riwayat Keputusan",
-          description: "Lihat pengajuan yang pernah Anda proses.",
-          href: APPROVAL_HISTORY_PATH,
-        },
-      ];
-    case ROLES.GURU_BK:
-      return [
-        {
-          icon: ClipboardList,
-          title: "Perlu Persetujuan",
-          description: "Tinjau pengajuan eskalasi tahap akhir.",
-          href: APPROVALS_PATH,
-        },
-        {
-          icon: Timer,
-          title: "Pemantauan Dispen",
-          description: "Pantau seluruh siswa yang sedang dispen keluar.",
-          href: PEMANTAUAN_PATH,
-        },
-        {
-          icon: History,
-          title: "Riwayat Keputusan",
-          description: "Pengajuan yang pernah Anda putuskan.",
-          href: APPROVAL_HISTORY_PATH,
-        },
-        {
-          icon: BarChart3,
-          title: "Dashboard Rekap",
-          description: "Rekapitulasi & tren perizinan siswa.",
-          href: REKAP_PATH,
-        },
-      ];
-    case ROLES.ADMIN:
-      return [
-        {
-          icon: Users,
-          title: "Data Master",
-          description: "Kelola siswa, guru, kelas & mata pelajaran.",
-          href: ADMIN_HOME_PATH,
-        },
-        {
-          icon: CalendarClock,
-          title: "Jadwal Pelajaran",
-          description: "Kelola mata pelajaran & jadwal per kelas.",
-          href: ADMIN_SCHEDULES_PATH,
-        },
-        {
-          icon: Timer,
-          title: "Pemantauan Dispen",
-          description: "Pantau seluruh siswa yang sedang dispen keluar.",
-          href: PEMANTAUAN_PATH,
-        },
-        {
-          icon: BarChart3,
-          title: "Dashboard Rekap",
-          description: "Rekapitulasi perizinan seluruh sekolah.",
-          href: REKAP_PATH,
-        },
-      ];
-    default:
-      return [];
-  }
-}
 
 export default async function DashboardPage() {
   const profile = await getProfile();
@@ -156,7 +28,10 @@ export default async function DashboardPage() {
 
   const firstName =
     (profile.full_name ?? "").trim().split(/\s+/)[0] || "Pengguna";
-  const menu = menuForRole(profile.role);
+  // Tile = menu navigasi peran ini, tanpa "Beranda".
+  const tiles = navItemsForRole(profile.role).filter(
+    (i) => i.href !== DASHBOARD_PATH,
+  );
 
   return (
     <div className="flex flex-col gap-6">
@@ -166,62 +41,96 @@ export default async function DashboardPage() {
         </h1>
         <p className="text-muted-foreground">
           Anda masuk sebagai{" "}
-          <span className="font-medium text-foreground">
+          <span className="text-foreground font-medium">
             {ROLE_LABELS[profile.role]}
           </span>
           .
         </p>
       </div>
 
-      {menu.length > 0 ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {menu.map((item) => {
-            const Icon = item.icon;
-            const inner = (
-              <Card
-                className={cn(
-                  "relative h-full gap-3 py-5",
-                  item.href
-                    ? "transition-colors group-hover:border-primary/40"
-                    : "opacity-90",
-                )}
-              >
-                {!item.href ? (
-                  <span className="bg-muted text-muted-foreground absolute right-4 top-4 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide">
-                    Segera
-                  </span>
-                ) : null}
+      {profile.role === ROLES.SISWA ? (
+        <ActiveDispenCard studentId={profile.id} />
+      ) : null}
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {tiles.map((item) => {
+          const Icon = item.icon;
+          return (
+            <Link key={item.href} href={item.href} className="group block">
+              <Card className="group-hover:border-primary/40 h-full gap-3 py-5 transition-colors">
                 <CardHeader className="gap-2">
                   <div className="bg-primary/10 text-primary flex size-9 items-center justify-center rounded-lg">
-                    <Icon className="size-5" />
+                    <Icon className="size-5" aria-hidden />
                   </div>
                   <CardTitle className="text-base">{item.title}</CardTitle>
                   <CardDescription>{item.description}</CardDescription>
                 </CardHeader>
               </Card>
-            );
-
-            return item.href ? (
-              <Link key={item.title} href={item.href} className="group block">
-                {inner}
-              </Link>
-            ) : (
-              <div key={item.title}>{inner}</div>
-            );
-          })}
-        </div>
-      ) : null}
-
-      <Card className="border-dashed">
-        <CardHeader>
-          <CardTitle className="text-base">Modul aktif 🚀</CardTitle>
-          <CardDescription>
-            Autentikasi, role, proteksi rute, dan pengajuan izin siswa (FR-2)
-            sudah berjalan. Berikutnya: auto-detect jadwal, persetujuan
-            berjenjang + eskalasi, dan surat izin PDF ber-QR Code.
-          </CardDescription>
-        </CardHeader>
-      </Card>
+            </Link>
+          );
+        })}
+      </div>
     </div>
+  );
+}
+
+/**
+ * Kartu "Dispen aktif" untuk siswa: hitung mundur + tombol "Kembali ke Sekolah"
+ * langsung di beranda, atau tombol "Mulai Dispen" bila izin baru disetujui.
+ * Tidak tampil bila tidak ada izin ber-timer yang sedang/siap berjalan.
+ */
+async function ActiveDispenCard({ studentId }: { studentId: string }) {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("permission_requests")
+    .select(
+      "id, izin_type, status, duration_minutes, dispen_started_at, dispen_deadline, returned_at",
+    )
+    .eq("student_id", studentId)
+    .eq("status", REQUEST_STATUS.APPROVED)
+    .not("duration_minutes", "is", null)
+    .is("returned_at", null)
+    .order("created_at", { ascending: false })
+    .limit(5);
+
+  const withPhase = (data ?? []).map((r) => ({ r, phase: dispenPhase(r) }));
+  // Prioritaskan yang sedang berjalan/terlambat, baru yang siap dimulai.
+  const current =
+    withPhase.find((x) => x.phase === "active" || x.phase === "overdue") ??
+    withPhase.find((x) => x.phase === "ready");
+  if (!current) return null;
+
+  const { r, phase } = current;
+  const running = phase === "active" || phase === "overdue";
+
+  return (
+    <Card className="gap-4 py-5">
+      <CardHeader className="flex flex-row items-start justify-between gap-3">
+        <div>
+          <CardTitle className="text-base">
+            {running ? "Dispen sedang berjalan" : "Izin siap digunakan"}
+          </CardTitle>
+          <CardDescription>
+            {IZIN_TYPE_LABELS[r.izin_type as IzinType]} · {r.duration_minutes}{" "}
+            menit
+          </CardDescription>
+        </div>
+        <Link
+          href={`/izin/${r.id}`}
+          className="text-primary inline-flex shrink-0 items-center gap-0.5 text-sm font-medium hover:underline"
+        >
+          Detail <ChevronRight className="size-4" aria-hidden />
+        </Link>
+      </CardHeader>
+      <CardContent>
+        <DispenControls
+          id={r.id}
+          phase={phase}
+          durationMinutes={r.duration_minutes}
+          dispenDeadline={r.dispen_deadline}
+          returnedAt={r.returned_at}
+        />
+      </CardContent>
+    </Card>
   );
 }

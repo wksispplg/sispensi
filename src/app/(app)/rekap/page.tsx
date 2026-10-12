@@ -1,18 +1,16 @@
 import Link from "next/link";
-import { RotateCcw, Search } from "lucide-react";
+import { FileSpreadsheet, FileText, RotateCcw, Search } from "lucide-react";
 
-import { createAdminClient } from "@/lib/supabase/admin";
 import { requireRole } from "@/lib/auth";
+import { IZIN_TYPE_LABELS, REKAP_PATH, ROLES } from "@/lib/constants";
 import {
-  IZIN_TYPE_LABELS,
-  REQUEST_STATUS,
-  REQUEST_STATUS_LABELS,
-  REKAP_PATH,
-  ROLES,
-  type IzinType,
-  type RequestStatus,
-} from "@/lib/constants";
-import { StatusBadge } from "@/components/status-badge";
+  REKAP_MAX_ROWS,
+  loadRekap,
+  parseRekapFilters,
+  rekapQueryString,
+  wibDateTime,
+} from "@/features/rekap/data";
+import { StatusBadge } from "@/features/izin/status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,177 +23,69 @@ import {
 } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
-const MONTHS = [
-  "Jan", "Feb", "Mar", "Apr", "Mei", "Jun",
-  "Jul", "Agu", "Sep", "Okt", "Nov", "Des",
-];
-const WIB_MS = 7 * 3600 * 1000;
-const wibDate = (d: Date) => new Date(d.getTime() + WIB_MS).toISOString().slice(0, 10);
-const dateFmt = new Intl.DateTimeFormat("id-ID", {
-  dateStyle: "medium",
-  timeStyle: "short",
-});
+/** Jumlah baris yang ditampilkan di tabel halaman (ekspor memuat semuanya). */
+const TABLE_ROWS = 100;
 
-/** Rentang default: 30 hari terakhir (WIB). Di luar komponen agar bebas dari aturan purity. */
-function defaultRange(): { from: string; to: string } {
-  const nowWib = new Date(Date.now() + WIB_MS);
-  const to = nowWib.toISOString().slice(0, 10);
-  const from = new Date(nowWib.getTime() - 29 * 86400000)
-    .toISOString()
-    .slice(0, 10);
-  return { from, to };
-}
-
-type Search = {
-  from?: string;
-  to?: string;
-  kelas?: string;
-  jenis?: string;
-  q?: string;
+const STATUS_COLOR: Record<string, string> = {
+  approved: "bg-emerald-500",
+  rejected: "bg-red-500",
+  pending: "bg-amber-500",
+  cancelled: "bg-zinc-400",
+  expired: "bg-zinc-400",
 };
 
 export default async function RekapPage({
   searchParams,
 }: {
-  searchParams: Promise<Search>;
+  searchParams: Promise<Record<string, string | undefined>>;
 }) {
   await requireRole(ROLES.GURU_BK, ROLES.ADMIN);
-  const sp = await searchParams;
+  const filters = parseRekapFilters(await searchParams);
+  const { from, to, kelas, jenis, q } = filters;
 
-  const { from: fromDefault, to: toDefault } = defaultRange();
+  const data = await loadRekap(filters, { rowLimit: TABLE_ROWS });
+  const exportQs = rekapQueryString(filters);
 
-  const from = sp.from || fromDefault;
-  const to = sp.to || toDefault;
-  const kelas = sp.kelas || "";
-  const jenis = sp.jenis || "";
-  const q = (sp.q || "").trim();
-
-  const admin = createAdminClient();
-
-  // Data master untuk filter.
-  const { data: classes } = await admin
-    .from("classes")
-    .select("id, name")
-    .order("name");
-  const classMap = new Map((classes ?? []).map((c) => [c.id, c.name] as const));
-
-  // Filter nama siswa -> daftar id.
-  let studentFilter: string[] | null = null;
-  if (q) {
-    const { data: matched } = await admin
-      .from("profiles")
-      .select("id")
-      .eq("role", "siswa")
-      .ilike("full_name", `%${q}%`);
-    studentFilter = (matched ?? []).map((m) => m.id);
-  }
-
-  // Query pengajuan sesuai filter.
-  let query = admin
-    .from("permission_requests")
-    .select(
-      "id, student_id, class_id, izin_type, status, current_layer, created_at",
-    )
-    .gte("created_at", `${from}T00:00:00+07:00`)
-    .lte("created_at", `${to}T23:59:59+07:00`);
-  if (kelas) query = query.eq("class_id", kelas);
-  if (jenis) query = query.eq("izin_type", jenis as IzinType);
-  if (studentFilter) {
-    query = query.in(
-      "student_id",
-      studentFilter.length ? studentFilter : ["00000000-0000-0000-0000-000000000000"],
-    );
-  }
-  const { data: reqData } = await query
-    .order("created_at", { ascending: false })
-    .limit(5000);
-  const requests = reqData ?? [];
-
-  // ---- Agregasi ----
-  const fromD = new Date(`${from}T00:00:00+07:00`);
-  const toD = new Date(`${to}T00:00:00+07:00`);
-  const spanDays = Math.round((toD.getTime() - fromD.getTime()) / 86400000) + 1;
-  const monthly = spanDays > 31;
-
-  const byStatus = new Map<string, number>();
-  const byIzin = new Map<string, number>();
-  const byClass = new Map<string, number>();
-  const trend = new Map<string, number>();
-  let escalatedL3 = 0;
-
-  for (const r of requests) {
-    byStatus.set(r.status, (byStatus.get(r.status) ?? 0) + 1);
-    byIzin.set(r.izin_type, (byIzin.get(r.izin_type) ?? 0) + 1);
-    byClass.set(r.class_id ?? "none", (byClass.get(r.class_id ?? "none") ?? 0) + 1);
-    if (r.current_layer >= 3) escalatedL3++;
-    const key = wibDate(new Date(r.created_at));
-    const bucket = monthly ? key.slice(0, 7) : key;
-    trend.set(bucket, (trend.get(bucket) ?? 0) + 1);
-  }
-
-  // Bucket berurutan untuk grafik tren.
-  const trendData: { label: string; value: number }[] = [];
-  if (monthly) {
-    let [yy, mm] = wibDate(fromD).slice(0, 7).split("-").map(Number);
-    const end = wibDate(toD).slice(0, 7);
-    while (`${yy}-${String(mm).padStart(2, "0")}` <= end) {
-      const key = `${yy}-${String(mm).padStart(2, "0")}`;
-      trendData.push({ label: MONTHS[mm - 1], value: trend.get(key) ?? 0 });
-      mm += 1;
-      if (mm > 12) {
-        mm = 1;
-        yy += 1;
-      }
-    }
-  } else {
-    for (let i = 0; i < spanDays; i++) {
-      const key = wibDate(new Date(fromD.getTime() + i * 86400000));
-      trendData.push({ label: key.slice(8), value: trend.get(key) ?? 0 });
-    }
-  }
-
-  const statusColor: Record<string, string> = {
-    approved: "bg-emerald-500",
-    rejected: "bg-red-500",
-    pending: "bg-amber-500",
-    cancelled: "bg-zinc-400",
-    expired: "bg-zinc-400",
-  };
-  const statusItems = Object.values(REQUEST_STATUS).map((s) => ({
-    label: REQUEST_STATUS_LABELS[s],
-    value: byStatus.get(s) ?? 0,
-    color: statusColor[s],
+  const statusItems = data.byStatus.map((s) => ({
+    label: s.label,
+    value: s.value,
+    color: STATUS_COLOR[s.key],
   }));
-  const izinItems = Object.entries(IZIN_TYPE_LABELS)
-    .map(([k, label]) => ({ label, value: byIzin.get(k) ?? 0 }))
-    .sort((a, b) => b.value - a.value);
-  const classItems = [...byClass.entries()]
-    .map(([id, value]) => ({
-      label: id === "none" ? "Tanpa kelas" : (classMap.get(id) ?? "—"),
-      value,
-    }))
-    .sort((a, b) => b.value - a.value);
-
-  // Nama siswa untuk tabel (100 baris pertama).
-  const tableRows = requests.slice(0, 100);
-  const sIds = [...new Set(tableRows.map((r) => r.student_id))];
-  const { data: studs } = await admin
-    .from("profiles")
-    .select("id, full_name, nis")
-    .in("id", sIds.length ? sIds : ["00000000-0000-0000-0000-000000000000"]);
-  const studentMap = new Map((studs ?? []).map((s) => [s.id, s] as const));
-
-  const total = requests.length;
+  // Label pendek di bawah batang grafik: tanggal (harian) / nama bulan (bulanan).
+  const trendData = data.trend.map((t) => ({
+    label: data.monthly ? t.label.split(" ")[0] : t.label.slice(8),
+    value: t.value,
+  }));
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Dashboard Rekapitulasi
-        </h1>
-        <p className="text-muted-foreground">
-          Ringkasan perizinan siswa. Periode {from} s/d {to}.
-        </p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            Dashboard Rekapitulasi
+          </h1>
+          <p className="text-muted-foreground">
+            Ringkasan perizinan siswa. Periode {from} s/d {to}.
+          </p>
+        </div>
+        <div className="flex flex-col gap-1 sm:items-end">
+          <div className="flex gap-2">
+            <Button variant="outline" asChild className="flex-1 sm:flex-none">
+              <a href={`${REKAP_PATH}/export?format=xlsx&${exportQs}`}>
+                <FileSpreadsheet className="size-4" aria-hidden /> Unduh Excel
+              </a>
+            </Button>
+            <Button variant="outline" asChild className="flex-1 sm:flex-none">
+              <a href={`${REKAP_PATH}/export?format=pdf&${exportQs}`}>
+                <FileText className="size-4" aria-hidden /> Unduh PDF
+              </a>
+            </Button>
+          </div>
+          <p className="text-muted-foreground text-xs">
+            Sesuai filter yang diterapkan · maks.{" "}
+            {REKAP_MAX_ROWS.toLocaleString("id-ID")} pengajuan
+          </p>
+        </div>
       </div>
 
       {/* Filter */}
@@ -217,7 +107,7 @@ export default async function RekapPage({
               <Label htmlFor="kelas">Kelas</Label>
               <SelectNative id="kelas" name="kelas" defaultValue={kelas}>
                 <option value="">Semua kelas</option>
-                {(classes ?? []).map((c) => (
+                {data.classes.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
                   </option>
@@ -254,35 +144,40 @@ export default async function RekapPage({
       </Card>
 
       {/* KPI */}
-      <div className="grid gap-4 grid-cols-2 lg:grid-cols-5">
-        <Stat label="Total Pengajuan" value={total} />
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+        <Stat label="Total Pengajuan" value={data.total} />
         <Stat
           label="Disetujui"
-          value={byStatus.get("approved") ?? 0}
+          value={data.approved}
           className="text-emerald-600 dark:text-emerald-400"
         />
         <Stat
-          label="Ditolak"
-          value={byStatus.get("rejected") ?? 0}
+          label={
+            data.autoRejected
+              ? `Ditolak (${data.autoRejected} otomatis)`
+              : "Ditolak"
+          }
+          value={data.rejected}
           className="text-red-600 dark:text-red-400"
         />
         <Stat
           label="Menunggu"
-          value={byStatus.get("pending") ?? 0}
+          value={data.pending}
           className="text-amber-600 dark:text-amber-400"
         />
-        <Stat label="Eskalasi Lapis 3" value={escalatedL3} />
+        <Stat label="Eskalasi Lapis 3" value={data.escalatedL3} />
+        <Stat label="Terlambat Kembali" value={data.lateReturns} />
       </div>
 
       {/* Tren */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">
-            Tren Pengajuan {monthly ? "Bulanan" : "Harian"}
+            Tren Pengajuan {data.monthly ? "Bulanan" : "Harian"}
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {total === 0 ? (
+          {data.total === 0 ? (
             <p className="text-muted-foreground text-sm">
               Tidak ada data pada periode ini.
             </p>
@@ -292,7 +187,7 @@ export default async function RekapPage({
         </CardContent>
       </Card>
 
-      {/* Breakdown */}
+      {/* Rincian */}
       <div className="grid gap-4 lg:grid-cols-3">
         <Card>
           <CardHeader>
@@ -307,7 +202,7 @@ export default async function RekapPage({
             <CardTitle className="text-base">Per Jenis Izin</CardTitle>
           </CardHeader>
           <CardContent>
-            <BarList items={izinItems} />
+            <BarList items={data.byIzin} />
           </CardContent>
         </Card>
         <Card>
@@ -315,7 +210,7 @@ export default async function RekapPage({
             <CardTitle className="text-base">Per Kelas</CardTitle>
           </CardHeader>
           <CardContent>
-            <BarList items={classItems} />
+            <BarList items={data.byClass} />
           </CardContent>
         </Card>
       </div>
@@ -326,12 +221,16 @@ export default async function RekapPage({
           <CardTitle className="text-base">
             Daftar Pengajuan{" "}
             <span className="text-muted-foreground font-normal">
-              ({total > 100 ? `100 dari ${total}` : total})
+              (
+              {data.total > TABLE_ROWS
+                ? `${TABLE_ROWS} dari ${data.total} — unduh Excel/PDF untuk semua`
+                : data.total}
+              )
             </span>
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {tableRows.length === 0 ? (
+          {data.rows.length === 0 ? (
             <p className="text-muted-foreground text-sm">Tidak ada data.</p>
           ) : (
             <div className="overflow-x-auto">
@@ -346,34 +245,29 @@ export default async function RekapPage({
                   </tr>
                 </thead>
                 <tbody>
-                  {tableRows.map((r) => {
-                    const s = studentMap.get(r.student_id);
-                    return (
-                      <tr key={r.id} className="border-b last:border-0">
-                        <td className="py-2 pr-3">
-                          {s?.full_name ?? "—"}
-                          {s?.nis ? (
-                            <span className="text-muted-foreground">
-                              {" "}
-                              · {s.nis}
-                            </span>
-                          ) : null}
-                        </td>
-                        <td className="py-2 pr-3">
-                          {r.class_id ? (classMap.get(r.class_id) ?? "—") : "—"}
-                        </td>
-                        <td className="py-2 pr-3">
-                          {IZIN_TYPE_LABELS[r.izin_type as IzinType]}
-                        </td>
-                        <td className="text-muted-foreground py-2 pr-3">
-                          {dateFmt.format(new Date(r.created_at))}
-                        </td>
-                        <td className="py-2">
-                          <StatusBadge status={r.status as RequestStatus} />
-                        </td>
-                      </tr>
-                    );
-                  })}
+                  {data.rows.map((r) => (
+                    <tr key={r.id} className="border-b last:border-0">
+                      <td className="py-2 pr-3">
+                        {r.studentName}
+                        {r.nis ? (
+                          <span className="text-muted-foreground"> · {r.nis}</span>
+                        ) : null}
+                      </td>
+                      <td className="py-2 pr-3">{r.className}</td>
+                      <td className="py-2 pr-3">{r.izinLabel}</td>
+                      <td className="text-muted-foreground py-2 pr-3">
+                        {wibDateTime.format(new Date(r.createdAt))}
+                      </td>
+                      <td className="py-2">
+                        <StatusBadge status={r.status} />
+                        {r.autoRejected ? (
+                          <span className="text-muted-foreground ml-1 text-xs">
+                            otomatis
+                          </span>
+                        ) : null}
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>

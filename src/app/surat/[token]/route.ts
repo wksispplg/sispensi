@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { createClient } from "@/lib/supabase/server";
-import { ensureLetterPdf } from "@/lib/letter";
+import { ensureLetterPdf } from "@/features/surat/letter";
 import { LOGIN_PATH } from "@/lib/constants";
 
 export async function GET(

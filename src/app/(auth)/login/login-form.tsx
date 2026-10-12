@@ -1,8 +1,8 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, GraduationCap } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, GraduationCap } from "lucide-react";
 
 import { login, type LoginState } from "./actions";
 import { Button } from "@/components/ui/button";
@@ -18,8 +18,10 @@ import {
 
 const initialState: LoginState = {};
 
-export function LoginForm({ as }: { as?: string }) {
+export function LoginForm({ as, next }: { as?: string; next?: string }) {
   const [state, formAction, pending] = useActionState(login, initialState);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
 
   const heading =
     as === "siswa"
@@ -43,6 +45,7 @@ export function LoginForm({ as }: { as?: string }) {
       </CardHeader>
       <CardContent>
         <form action={formAction} className="flex flex-col gap-4">
+          <input type="hidden" name="next" value={next ?? ""} />
           <div className="flex flex-col gap-2">
             <Label htmlFor="email">Email</Label>
             <Input
@@ -50,19 +53,60 @@ export function LoginForm({ as }: { as?: string }) {
               name="email"
               type="email"
               autoComplete="email"
+              defaultValue={state.email}
               placeholder="nama@smktelkom-pwt.sch.id"
               required
             />
           </div>
           <div className="flex flex-col gap-2">
-            <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              name="password"
-              type="password"
-              autoComplete="current-password"
-              required
-            />
+            <div className="flex items-center justify-between gap-2">
+              <Label htmlFor="password">Password</Label>
+              <button
+                type="button"
+                onClick={() => setShowHelp((v) => !v)}
+                aria-expanded={showHelp}
+                aria-controls="lupa-password"
+                className="text-brand hover:text-brand-dark focus-visible:ring-ring/50 rounded-sm text-sm font-medium outline-none focus-visible:ring-[3px]"
+              >
+                Lupa password?
+              </button>
+            </div>
+            <div className="relative">
+              <Input
+                id="password"
+                name="password"
+                type={showPassword ? "text" : "password"}
+                autoComplete="current-password"
+                required
+                className="pr-10"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                aria-label={
+                  showPassword ? "Sembunyikan password" : "Tampilkan password"
+                }
+                aria-pressed={showPassword}
+                className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 absolute inset-y-0 right-0 flex w-10 items-center justify-center rounded-r-md outline-none focus-visible:ring-[3px]"
+              >
+                {showPassword ? (
+                  <EyeOff className="size-4" />
+                ) : (
+                  <Eye className="size-4" />
+                )}
+              </button>
+            </div>
+            <p
+              id="lupa-password"
+              hidden={!showHelp}
+              className="bg-muted text-muted-foreground rounded-md px-3 py-2 text-xs"
+            >
+              Akun SIPENSI dikelola sekolah. Hubungi{" "}
+              <span className="text-foreground font-medium">
+                Administrator SIPENSI
+              </span>{" "}
+              (bagian Tata Usaha) untuk mereset password Anda.
+            </p>
           </div>
 
           {state.error ? (
