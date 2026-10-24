@@ -144,7 +144,7 @@ export default async function AdminJadwalPage() {
                     {rows.map((s) => (
                       <li
                         key={s.id}
-                        className="flex items-center gap-3 py-2 text-sm"
+                        className="flex flex-wrap items-center gap-x-2 gap-y-1 py-3 text-sm sm:flex-nowrap sm:gap-x-3"
                       >
                         <span className="w-16 shrink-0 font-medium">
                           {DAY_LABELS[s.day_of_week]}
@@ -152,7 +152,7 @@ export default async function AdminJadwalPage() {
                         <span className="text-muted-foreground w-24 shrink-0 tabular-nums">
                           {hhmm(s.start_time)}–{hhmm(s.end_time)}
                         </span>
-                        <span className="min-w-0 flex-1 truncate">
+                        <span className="order-last min-w-0 basis-full wrap-anywhere sm:order-none sm:flex-1 sm:basis-auto">
                           {s.subject_id
                             ? (subjectMap.get(s.subject_id) ?? "—")
                             : "—"}

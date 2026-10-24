@@ -77,14 +77,14 @@ export default async function AdminKelasPage() {
                   key={c.id}
                   className="flex flex-wrap items-center gap-3 py-3"
                 >
-                  <div className="min-w-40 flex-1">
+                  <div className="min-w-0 flex-1 basis-full wrap-anywhere sm:min-w-40 sm:basis-auto">
                     <p className="font-medium">{c.name}</p>
                     <p className="text-muted-foreground text-xs">
                       {c.grade_level ? `Tingkat ${c.grade_level}` : "—"}
                       {c.major ? ` · ${c.major}` : ""}
                     </p>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex w-full min-w-0 items-center gap-2 sm:w-auto">
                     <span className="text-muted-foreground text-xs">Wali:</span>
                     <InlineSelect
                       id={c.id}

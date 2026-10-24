@@ -93,7 +93,7 @@ export default async function RekapPage({
         <CardContent className="pt-6">
           <form
             method="get"
-            className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6 lg:items-end"
+            className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 lg:items-end"
           >
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="from">Dari</Label>

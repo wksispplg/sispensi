@@ -125,6 +125,185 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
+/* Panel merah bergaris kisi (hero landing, CTA, panel login). */
+@utility bg-brand-grid {
+  background-color: var(--brand);
+  background-image:
+    linear-gradient(to right, rgb(255 255 255 / 0.08) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(255 255 255 / 0.08) 1px, transparent 1px),
+    radial-gradient(
+      120% 85% at 50% 0%,
+      #f43a3a 0%,
+      var(--brand) 45%,
+      var(--brand-dark) 100%
+    );
+  background-size:
+    72px 72px,
+    72px 72px,
+    100% 100%;
+  background-position: center top;
+}
+
+/* ── Animasi landing & login ───────────────────────────────────────────── */
+
+/* animate-rise: muncul naik saat halaman dimuat (hero). Jarak awal bisa
+   diatur lewat --rise-from; jeda lewat [animation-delay:…]. */
+@theme {
+  --animate-rise: rise 0.8s cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-float: float 8s ease-in-out infinite;
+  --animate-enter-right: enter-right 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+
+  @keyframes rise {
+    from {
+      opacity: 0;
+      translate: 0 var(--rise-from, 1.5rem);
+    }
+  }
+  @keyframes enter-right {
+    from {
+      opacity: 0;
+      translate: 3rem 0;
+    }
+  }
+  @keyframes float {
+    50% {
+      translate: 0 -0.75rem;
+    }
+  }
+}
+
+/* Muncul saat di-scroll: elemen ber-[data-reveal] diberi [data-revealed] oleh
+   (landing)/scroll-reveal.tsx. Tanpa JS atau bila pengguna memilih kurangi
+   gerakan, konten langsung tampil apa adanya. */
+@media (scripting: enabled) and (prefers-reduced-motion: no-preference) {
+  [data-reveal] {
+    opacity: 0;
+    translate: 0 2rem;
+    transition:
+      opacity 0.8s cubic-bezier(0.22, 1, 0.36, 1),
+      translate 0.8s cubic-bezier(0.22, 1, 0.36, 1),
+      scale 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+    transition-delay: var(--reveal-delay, 0ms);
+  }
+  [data-reveal="left"] {
+    translate: -2.5rem 0;
+  }
+  [data-reveal="right"] {
+    translate: 2.5rem 0;
+  }
+  [data-reveal="zoom"] {
+    translate: 0 1.5rem;
+    scale: 0.96;
+  }
+  /* Garis yang "tergambar" dari kiri ke kanan. */
+  [data-reveal="draw"] {
+    opacity: 1;
+    translate: none;
+    scale: 0 1;
+    transform-origin: left;
+    transition-duration: 1.4s;
+  }
+  [data-reveal][data-revealed] {
+    opacity: 1;
+    translate: none;
+    scale: none;
+  }
+}
+
+/* View Transitions antarhalaman (lihat components/common/transitions.tsx &
+   transition-link.tsx). Urutannya: (1) isi halaman lama memudar dulu,
+   (2) panel merah yang sudah polos berubah bentuk ke posisi barunya,
+   (3) isi panel baru muncul belakangan. Hanya opacity & transform (tanpa
+   blur) agar dikerjakan GPU dan tetap mulus. */
+::view-transition {
+  pointer-events: none;
+}
+
+/* (1) Isi yang memudar saat TransitionLink diklik, sebelum navigasi. */
+[data-fade-on-leave] {
+  transition:
+    opacity 0.2s ease-out,
+    translate 0.2s ease-out;
+}
+:root[data-leaving] [data-fade-on-leave] {
+  opacity: 0;
+  translate: 0 -0.5rem;
+}
+
+/* (2) Morph panel merah: gambar lama (panel polos) tetap utuh di bawah,
+   gambar baru memudar masuk di atasnya — tidak ada momen tembus pandang. */
+::view-transition-group(.morph) {
+  /* Selalu di atas lapisan halaman yang bergeser; tanpa ini, saat kembali ke
+     beranda lapisan putih halaman baru menutupi panel (jadi pink). */
+  z-index: 1;
+  animation-duration: 0.5s;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+::view-transition-old(.morph),
+::view-transition-new(.morph) {
+  height: 100%;
+}
+::view-transition-old(.morph) {
+  animation: none;
+}
+::view-transition-new(.morph) {
+  animation: vt-fade-in 0.3s ease-out 0.15s both;
+}
+
+/* Isi halaman bergeser sesuai arah navigasi. */
+::view-transition-old(.nav-forward),
+::view-transition-old(.nav-back) {
+  animation:
+    0.2s ease-out both vt-fade-out,
+    0.4s cubic-bezier(0.22, 1, 0.36, 1) both vt-slide-out;
+}
+::view-transition-new(.nav-forward),
+::view-transition-new(.nav-back) {
+  animation:
+    0.3s ease-out 0.1s both vt-fade-in,
+    0.5s cubic-bezier(0.22, 1, 0.36, 1) both vt-slide-in;
+}
+::view-transition-old(.nav-forward) {
+  --slide-offset: -48px;
+}
+::view-transition-new(.nav-forward) {
+  --slide-offset: 48px;
+}
+::view-transition-old(.nav-back) {
+  --slide-offset: 48px;
+}
+::view-transition-new(.nav-back) {
+  --slide-offset: -48px;
+}
+@keyframes vt-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes vt-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes vt-slide-in {
+  from {
+    translate: var(--slide-offset);
+  }
+}
+@keyframes vt-slide-out {
+  to {
+    translate: var(--slide-offset);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(*),
+  ::view-transition-new(*),
+  ::view-transition-group(*) {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
+  }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

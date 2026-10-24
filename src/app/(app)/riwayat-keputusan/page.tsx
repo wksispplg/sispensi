@@ -79,9 +79,9 @@ export default async function RiwayatKeputusanPage() {
             return (
               <Link key={r.id} href={`/persetujuan/${r.id}`} className="group">
                 <Card className="py-4 transition-colors group-hover:border-primary/40">
-                  <CardContent className="flex items-center gap-4">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
+                  <CardContent className="flex flex-wrap items-center gap-x-3 gap-y-2 sm:flex-nowrap sm:gap-4">
+                    <div className="min-w-0 flex-1 basis-full sm:basis-auto">
+                      <div className="flex flex-wrap items-center gap-2">
                         <p className="truncate font-medium">{studentName}</p>
                         {className ? (
                           <span className="text-muted-foreground text-xs">
@@ -102,7 +102,7 @@ export default async function RiwayatKeputusanPage() {
                       ) : null}
                     </div>
                     <RequestBadge req={r} />
-                    <ChevronRight className="text-muted-foreground size-4 shrink-0" />
+                    <ChevronRight className="text-muted-foreground ml-auto size-4 shrink-0 sm:ml-0" />
                   </CardContent>
                 </Card>
               </Link>

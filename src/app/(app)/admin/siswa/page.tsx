@@ -105,7 +105,7 @@ export default async function AdminSiswaPage() {
                   key={s.id}
                   className="flex flex-wrap items-center gap-3 py-3"
                 >
-                  <div className="min-w-40 flex-1">
+                  <div className="min-w-0 flex-1 basis-full wrap-anywhere sm:min-w-40 sm:basis-auto">
                     <p className="font-medium">{s.full_name ?? "—"}</p>
                     <p className="text-muted-foreground text-xs">
                       {emailMap.get(s.id) ?? ""}

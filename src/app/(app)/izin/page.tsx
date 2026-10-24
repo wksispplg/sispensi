@@ -41,7 +41,7 @@ export default async function RiwayatIzinPage({
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">
             Riwayat Pengajuan
@@ -51,7 +51,7 @@ export default async function RiwayatIzinPage({
           </p>
         </div>
         {isSiswa ? (
-          <Button asChild>
+          <Button asChild className="w-full sm:w-auto">
             <Link href="/izin/ajukan">
               <FilePlus2 className="size-4" />
               Ajukan Izin
@@ -92,9 +92,9 @@ export default async function RiwayatIzinPage({
           {list.map((r) => (
             <Link key={r.id} href={`/izin/${r.id}`} className="group">
               <Card className="py-4 transition-colors group-hover:border-primary/40">
-                <CardContent className="flex items-center gap-4">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
+                <CardContent className="flex flex-wrap items-center gap-x-3 gap-y-2 sm:flex-nowrap sm:gap-4">
+                  <div className="min-w-0 flex-1 basis-full sm:basis-auto">
+                    <div className="flex flex-wrap items-center gap-2">
                       <p className="truncate font-medium">
                         {IZIN_TYPE_LABELS[r.izin_type as IzinType]}
                       </p>
@@ -113,7 +113,7 @@ export default async function RiwayatIzinPage({
                     </p>
                   </div>
                   <RequestBadge req={r} />
-                  <ChevronRight className="text-muted-foreground size-4 shrink-0" />
+                  <ChevronRight className="text-muted-foreground ml-auto size-4 shrink-0 sm:ml-0" />
                 </CardContent>
               </Card>
             </Link>

@@ -98,8 +98,8 @@ export default async function PersetujuanDetailPage({
 
       <Card>
         <CardHeader>
-          <div className="flex items-start justify-between gap-3">
-            <div>
+          <div className="flex flex-col items-start justify-between gap-3 sm:flex-row">
+            <div className="min-w-0">
               <CardTitle>{student?.full_name ?? "Siswa"}</CardTitle>
               <p className="text-muted-foreground text-sm">
                 {className ?? "Tanpa kelas"}
@@ -188,7 +188,7 @@ export default async function PersetujuanDetailPage({
             {(logs ?? []).map((log) => (
               <li key={log.id} className="flex gap-3">
                 <span className="bg-primary mt-1.5 size-2 rounded-full" />
-                <div className="flex-1">
+                <div className="min-w-0 flex-1 wrap-anywhere">
                   <p className="text-sm font-medium">
                     {APPROVAL_ACTION_LABELS[log.action as ApprovalAction] ??
                       log.action}
@@ -221,9 +221,9 @@ function Field({
   children: React.ReactNode;
 }) {
   return (
-    <div className="grid grid-cols-[8rem_1fr] gap-2">
+    <div className="grid grid-cols-1 gap-1 sm:grid-cols-[8rem_minmax(0,1fr)] sm:gap-2">
       <span className="text-muted-foreground">{label}</span>
-      <span className="min-w-0 break-words">{children}</span>
+      <span className="min-w-0 wrap-anywhere">{children}</span>
     </div>
   );
 }

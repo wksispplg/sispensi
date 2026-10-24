@@ -86,7 +86,7 @@ export default async function VerifyPage({
                   </span>
                 </div>
               )}
-              <dl className="grid grid-cols-[7rem_1fr] gap-2 text-sm">
+              <dl className="grid grid-cols-[6rem_minmax(0,1fr)] gap-2 text-sm wrap-anywhere sm:grid-cols-[7rem_minmax(0,1fr)]">
                 <dt className="text-muted-foreground">Nama</dt>
                 <dd className="font-medium">{info.student_name ?? "-"}</dd>
                 <dt className="text-muted-foreground">Kelas</dt>

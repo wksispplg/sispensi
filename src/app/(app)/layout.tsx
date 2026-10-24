@@ -31,8 +31,8 @@ export default async function AppLayout({
   return (
     <div className="flex min-h-svh flex-1 flex-col">
       <AppHeader profile={profile} />
-      {/* pb-24 di HP agar konten tidak tertutup navigasi bawah */}
-      <main className="mx-auto w-full max-w-5xl flex-1 px-4 pt-6 pb-24 sm:px-6 lg:pb-6">
+      {/* Ruang untuk navigasi bawah, termasuk safe area pada HP. */}
+      <main className="mx-auto w-full min-w-0 max-w-5xl flex-1 px-4 pt-6 pb-[calc(6rem+env(safe-area-inset-bottom))] sm:px-6 xl:pb-6">
         {children}
       </main>
       <MobileNav role={profile.role} />
@@ -43,7 +43,7 @@ export default async function AppLayout({
 function AppHeader({ profile }: { profile: Profile }) {
   return (
     <header className="border-b bg-background">
-      <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
+      <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
         <Link
           href={DASHBOARD_PATH}
           aria-label="Ke beranda SIPENSI"
@@ -60,7 +60,7 @@ function AppHeader({ profile }: { profile: Profile }) {
           </div>
         </Link>
         <DesktopNav role={profile.role} />
-        <div className="flex items-center gap-1.5 sm:gap-3">
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
           <NotificationBell userId={profile.id} role={profile.role} />
           <div className="hidden text-right leading-tight sm:block">
             <p className="max-w-[10rem] truncate text-sm font-medium">

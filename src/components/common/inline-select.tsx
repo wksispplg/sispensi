@@ -26,7 +26,7 @@ export function InlineSelect({
 
   return (
     <SelectNative
-      className="h-11 w-auto min-w-40 text-sm md:h-8"
+      className="h-11 w-full sm:w-auto sm:min-w-40 md:h-8"
       defaultValue={value ?? ""}
       disabled={pending}
       onChange={(e) => startTransition(() => action(id, e.target.value))}

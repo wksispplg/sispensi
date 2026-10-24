@@ -207,7 +207,7 @@ export function NotificationBell({
             aria-hidden
             onClick={() => setOpen(false)}
           />
-          <div className="bg-popover text-popover-foreground absolute right-0 z-50 mt-2 w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-lg border shadow-lg">
+          <div className="bg-popover text-popover-foreground fixed inset-x-4 top-20 z-50 overflow-hidden rounded-lg border shadow-lg sm:absolute sm:inset-x-auto sm:top-auto sm:right-0 sm:mt-2 sm:w-80 sm:max-w-[calc(100vw-2rem)]">
             <div className="flex items-center justify-between border-b px-3 py-2">
               <p className="text-sm font-medium">Notifikasi</p>
               {unread > 0 ? (
@@ -221,7 +221,7 @@ export function NotificationBell({
               ) : null}
             </div>
 
-            <div className="max-h-96 overflow-y-auto">
+            <div className="max-h-[min(24rem,calc(100dvh-9rem))] overflow-y-auto">
               {items.length === 0 ? (
                 <p className="text-muted-foreground px-3 py-6 text-center text-sm">
                   Belum ada notifikasi.
@@ -244,7 +244,7 @@ export function NotificationBell({
                               {n.title}
                             </p>
                           ) : null}
-                          <p className="text-muted-foreground text-sm">
+                          <p className="text-muted-foreground text-sm wrap-anywhere">
                             {n.message}
                           </p>
                           <p className="text-muted-foreground mt-0.5 text-xs">
