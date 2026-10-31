@@ -1,13 +1,10 @@
 import type { ReactNode } from "react";
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { GraduationCap } from "lucide-react";
 
 import { getProfile, getSessionUser } from "@/lib/auth";
-import { DASHBOARD_PATH, LOGIN_PATH, ROLE_LABELS } from "@/lib/constants";
+import { LOGIN_PATH } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
-import { NotificationBell } from "@/components/layout/notification-bell";
-import { DesktopNav, MobileNav } from "@/components/layout/app-nav";
+import { AppShell } from "@/components/layout/app-shell";
 import {
   Card,
   CardContent,
@@ -15,7 +12,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import type { Profile } from "@/types";
 
 export default async function AppLayout({
   children,
@@ -29,55 +25,9 @@ export default async function AppLayout({
   if (!profile) return <AccountNotProvisioned email={user.email ?? ""} />;
 
   return (
-    <div className="flex min-h-svh flex-1 flex-col">
-      <AppHeader profile={profile} />
-      {/* Ruang untuk navigasi bawah, termasuk safe area pada HP. */}
-      <main className="mx-auto w-full min-w-0 max-w-5xl flex-1 px-4 pt-6 pb-[calc(6rem+env(safe-area-inset-bottom))] sm:px-6 xl:pb-6">
-        {children}
-      </main>
-      <MobileNav role={profile.role} />
-    </div>
-  );
-}
-
-function AppHeader({ profile }: { profile: Profile }) {
-  return (
-    <header className="border-b bg-background">
-      <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
-        <Link
-          href={DASHBOARD_PATH}
-          aria-label="Ke beranda SIPENSI"
-          className="focus-visible:ring-ring/50 flex min-w-0 items-center gap-2 rounded-md outline-none transition-opacity hover:opacity-80 focus-visible:ring-[3px]"
-        >
-          <div className="bg-brand text-brand-foreground flex size-8 shrink-0 items-center justify-center rounded-lg">
-            <GraduationCap className="size-5" />
-          </div>
-          <div className="leading-tight">
-            <p className="text-sm font-semibold">SIPENSI</p>
-            <p className="text-muted-foreground hidden text-xs sm:block">
-              SMK Telkom Purwokerto
-            </p>
-          </div>
-        </Link>
-        <DesktopNav role={profile.role} />
-        <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
-          <NotificationBell userId={profile.id} role={profile.role} />
-          <div className="hidden text-right leading-tight sm:block">
-            <p className="max-w-[10rem] truncate text-sm font-medium">
-              {profile.full_name ?? "Pengguna"}
-            </p>
-            <p className="text-muted-foreground text-xs">
-              {ROLE_LABELS[profile.role]}
-            </p>
-          </div>
-          <form action="/auth/signout" method="post">
-            <Button type="submit" variant="outline" size="sm">
-              Keluar
-            </Button>
-          </form>
-        </div>
-      </div>
-    </header>
+    <AppShell profile={profile}>
+      {children}
+    </AppShell>
   );
 }
 

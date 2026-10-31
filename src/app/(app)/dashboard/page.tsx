@@ -21,6 +21,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { HomeWelcome } from "./home-welcome";
 
 export default async function DashboardPage() {
   const profile = await getProfile();
@@ -28,6 +29,7 @@ export default async function DashboardPage() {
 
   const firstName =
     (profile.full_name ?? "").trim().split(/\s+/)[0] || "Pengguna";
+  const fullName = profile.full_name?.trim() || "Pengguna";
   // Tile = menu navigasi peran ini, tanpa "Beranda".
   const tiles = navItemsForRole(profile.role).filter(
     (i) => i.href !== DASHBOARD_PATH,
@@ -35,7 +37,9 @@ export default async function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
+      <HomeWelcome name={fullName} identifier={profile.nis?.trim() || firstName} />
+
+      <div className="lg:hidden">
         <h1 className="text-2xl font-semibold tracking-tight">
           Halo, {firstName} 👋
         </h1>
@@ -52,7 +56,7 @@ export default async function DashboardPage() {
         <ActiveDispenCard studentId={profile.id} />
       ) : null}
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:hidden">
         {tiles.map((item) => {
           const Icon = item.icon;
           return (
