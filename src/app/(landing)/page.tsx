@@ -21,6 +21,7 @@ import { TransitionLink } from "@/components/common/transition-link";
 import { AppPreview } from "./app-preview";
 import { LetterPreview } from "./letter-preview";
 import { ScrollReveal } from "./scroll-reveal";
+import { ChatWidget } from "@/features/chatbot/chat-widget";
 
 const pill =
   "inline-flex h-11 items-center justify-center gap-2 rounded-full px-6 text-sm font-semibold outline-none transition-colors focus-visible:ring-[3px]";
@@ -113,6 +114,7 @@ export default async function Home() {
         <HowItWorks />
         <CallToAction />
         <SiteFooter />
+        <ChatWidget />
       </div>
     </PageSlide>
   );

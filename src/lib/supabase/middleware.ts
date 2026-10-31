@@ -4,6 +4,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { env } from "@/lib/env";
 import { LOGIN_PATH } from "@/lib/constants";
 import type { Database } from "@/types/database";
+import { CHAT_ENDPOINT } from "@/features/chatbot/contract";
 
 /** Rute yang boleh diakses tanpa login. */
 const PUBLIC_PREFIXES = [LOGIN_PATH, "/verify", "/auth"];
@@ -20,6 +21,9 @@ function isPublicPath(pathname: string): boolean {
  * Dipanggil dari `src/proxy.ts` (konvensi Proxy Next.js 16, pengganti middleware).
  */
 export async function updateSession(request: NextRequest) {
+  // Chat publik tidak mengakses sesi atau data Supabase. Rute lain tetap dijaga.
+  if (request.nextUrl.pathname === CHAT_ENDPOINT) return NextResponse.next({ request });
+
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient<Database>(
