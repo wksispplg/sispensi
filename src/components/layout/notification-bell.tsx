@@ -3,13 +3,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Bell, CheckCheck } from "lucide-react";
+import { Bell } from "lucide-react";
 import { toast } from "sonner";
 
 import { createClient } from "@/lib/supabase/client";
-import { ROLES, NOTIFICATIONS_PATH, type Role } from "@/lib/constants";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { NOTIFICATIONS_PATH, type Role } from "@/lib/constants";
 
 type Notif = {
   id: string;
@@ -19,12 +17,6 @@ type Notif = {
   request_id: string | null;
   created_at: string;
 };
-
-const timeFmt = new Intl.DateTimeFormat("id-ID", {
-  dateStyle: "short",
-  timeStyle: "short",
-  timeZone: "Asia/Jakarta",
-});
 
 /** Bunyi "ding" dua nada via Web Audio. */
 function playDing(ctx: AudioContext) {
@@ -51,31 +43,19 @@ function playDing(ctx: AudioContext) {
 
 export function NotificationBell({
   userId,
-  role,
 }: {
   userId: string;
   role: Role;
 }) {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
-  const [items, setItems] = useState<Notif[]>([]);
   const [unread, setUnread] = useState(0);
-  const [open, setOpen] = useState(false);
   const audioRef = useRef<AudioContext | null>(null);
   const dingPendingRef = useRef(false);
 
   // Muat notifikasi awal.
   useEffect(() => {
     let active = true;
-    supabase
-      .from("notifications")
-      .select("id, title, message, is_read, request_id, created_at")
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false })
-      .limit(20)
-      .then(({ data }) => {
-        if (active && data) setItems(data);
-      });
     supabase.from("notifications").select("id", { count: "exact", head: true })
       .eq("user_id", userId).eq("is_read", false)
       .then(({ count }) => { if (active && count !== null) setUnread(count); });
@@ -145,8 +125,6 @@ export function NotificationBell({
         },
         (payload) => {
           if (payload.eventType !== "INSERT") {
-            const updated = payload.new as Notif;
-            if (payload.eventType === "UPDATE") setItems((previous) => previous.map((item) => item.id === updated.id ? updated : item));
             supabase.from("notifications").select("id", { count: "exact", head: true })
               .eq("user_id", userId).eq("is_read", false)
               .then(({ count }) => { if (count !== null) setUnread(count); });
@@ -154,9 +132,6 @@ export function NotificationBell({
           }
           const n = payload.new as Notif;
           if (!n.is_read) setUnread((previous) => previous + 1);
-          setItems((prev) =>
-            prev.some((i) => i.id === n.id) ? prev : [n, ...prev].slice(0, 30),
-          );
           if (document.visibilityState !== "visible") {
             dingPendingRef.current = true; // bunyikan saat tab kembali aktif
           } else if (audioRef.current) {
@@ -174,140 +149,8 @@ export function NotificationBell({
     };
   }, [supabase, userId, router]);
 
-  async function markRead(id: string) {
-    const { error } = await supabase.from("notifications").update({ is_read: true }).eq("id", id).eq("user_id", userId);
-    if (error) { toast.error("Notifikasi belum dapat ditandai dibaca."); return; }
-    setItems((prev) =>
-      prev.map((i) => (i.id === id ? { ...i, is_read: true } : i)),
-    );
-    const { count } = await supabase.from("notifications").select("id", { count: "exact", head: true }).eq("user_id", userId).eq("is_read", false);
-    if (count !== null) setUnread(count);
-  }
-
-  async function markAll() {
-    const ids = items.filter((i) => !i.is_read).map((i) => i.id);
-    if (ids.length === 0) return;
-    const { error } = await supabase.from("notifications").update({ is_read: true }).in("id", ids).eq("user_id", userId);
-    if (error) { toast.error("Notifikasi belum dapat ditandai dibaca."); return; }
-    setItems((prev) => prev.map((i) => ({ ...i, is_read: true })));
-    const { count } = await supabase.from("notifications").select("id", { count: "exact", head: true }).eq("user_id", userId).eq("is_read", false);
-    if (count !== null) setUnread(count);
-  }
-
-  function hrefFor(n: Notif): string | null {
-    if (!n.request_id) return null;
-    return role === ROLES.SISWA
-      ? `/izin/${n.request_id}`
-      : `/persetujuan/${n.request_id}`;
-  }
-
-  if (role === ROLES.SISWA) return <Link href={NOTIFICATIONS_PATH} aria-label={`Notifikasi${unread ? ` (${unread} belum dibaca)` : ""}`} className="relative flex size-10 items-center justify-center rounded-full hover:bg-zinc-200/50 focus-visible:outline-2 focus-visible:outline-red-300">
+  return <Link href={NOTIFICATIONS_PATH} aria-label={`Notifikasi${unread ? ` (${unread} belum dibaca)` : ""}`} className="relative flex size-10 items-center justify-center rounded-full hover:bg-zinc-200/50 focus-visible:outline-2 focus-visible:outline-red-300">
     <Bell className="size-5" strokeWidth={1.6} aria-hidden />
     {unread > 0 ? <span className="absolute top-0 right-0 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#f00000] px-1 text-[9px] text-white">{unread > 9 ? "9+" : unread}</span> : null}
   </Link>;
-
-  return (
-    <div className="relative">
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        aria-label={`Notifikasi${unread ? ` (${unread} belum dibaca)` : ""}`}
-        onClick={() => setOpen((o) => !o)}
-        className="relative"
-      >
-        <Bell className="size-5" />
-        {unread > 0 ? (
-          <span className="bg-destructive absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-medium text-white">
-            {unread > 9 ? "9+" : unread}
-          </span>
-        ) : null}
-      </Button>
-
-      {open ? (
-        <>
-          <div
-            className="fixed inset-0 z-40"
-            aria-hidden
-            onClick={() => setOpen(false)}
-          />
-          <div className="bg-popover text-popover-foreground fixed inset-x-4 top-20 z-50 overflow-hidden rounded-lg border shadow-lg sm:absolute sm:inset-x-auto sm:top-auto sm:right-0 sm:mt-2 sm:w-80 sm:max-w-[calc(100vw-2rem)]">
-            <div className="flex items-center justify-between border-b px-3 py-2">
-              <p className="text-sm font-medium">Notifikasi</p>
-              {unread > 0 ? (
-                <button
-                  type="button"
-                  onClick={markAll}
-                  className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs"
-                >
-                  <CheckCheck className="size-3.5" /> Tandai semua
-                </button>
-              ) : null}
-            </div>
-
-            <div className="max-h-[min(24rem,calc(100dvh-9rem))] overflow-y-auto">
-              {items.length === 0 ? (
-                <p className="text-muted-foreground px-3 py-6 text-center text-sm">
-                  Belum ada notifikasi.
-                </p>
-              ) : (
-                <ul className="divide-y">
-                  {items.map((n) => {
-                    const href = hrefFor(n);
-                    const body = (
-                      <div className="flex gap-2">
-                        <span
-                          className={cn(
-                            "mt-1.5 size-2 shrink-0 rounded-full",
-                            n.is_read ? "bg-transparent" : "bg-primary",
-                          )}
-                        />
-                        <div className="min-w-0">
-                          {n.title ? (
-                            <p className="truncate text-sm font-medium">
-                              {n.title}
-                            </p>
-                          ) : null}
-                          <p className="text-muted-foreground text-sm wrap-anywhere">
-                            {n.message}
-                          </p>
-                          <p className="text-muted-foreground mt-0.5 text-xs">
-                            {timeFmt.format(new Date(n.created_at))}
-                          </p>
-                        </div>
-                      </div>
-                    );
-                    return (
-                      <li key={n.id} className="hover:bg-muted/50">
-                        {href ? (
-                          <Link
-                            href={href}
-                            onClick={() => {
-                              markRead(n.id);
-                              setOpen(false);
-                            }}
-                            className="block px-3 py-2.5"
-                          >
-                            {body}
-                          </Link>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => markRead(n.id)}
-                            className="block w-full px-3 py-2.5 text-left"
-                          >
-                            {body}
-                          </button>
-                        )}
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </div>
-          </div>
-        </>
-      ) : null}
-    </div>
-  );
 }

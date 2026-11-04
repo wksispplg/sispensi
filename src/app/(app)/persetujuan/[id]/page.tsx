@@ -89,16 +89,16 @@ export default async function PersetujuanDetailPage({
       profile.role === ROLES.ADMIN);
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-4">
+    <div className="grid min-w-0 items-start gap-5 lg:grid-cols-[minmax(0,1.5fr)_minmax(280px,1fr)]">
       <Link
         href="/persetujuan"
-        className="text-muted-foreground hover:text-foreground inline-flex w-fit items-center gap-1 text-sm"
+        className="text-muted-foreground hover:text-foreground inline-flex w-fit items-center gap-1 text-sm lg:col-span-2"
       >
         <ArrowLeft className="size-4" />
         Kembali ke daftar
       </Link>
 
-      <Card>
+      <Card className="lg:row-span-2">
         <CardHeader>
           <div className="flex flex-col items-start justify-between gap-3 sm:flex-row">
             <div className="min-w-0">

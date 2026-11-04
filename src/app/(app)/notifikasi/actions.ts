@@ -2,12 +2,12 @@
 
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
-import { requireRole } from "@/lib/auth";
-import { ROLES, NOTIFICATIONS_PATH } from "@/lib/constants";
+import { requireProfile } from "@/lib/auth";
+import { NOTIFICATIONS_PATH } from "@/lib/constants";
 import { createClient } from "@/lib/supabase/server";
 
 export async function readNotifications(id?: string): Promise<{ error?: string }> {
-  const profile = await requireRole(ROLES.SISWA);
+  const profile = await requireProfile();
   if (id !== undefined && !z.uuid().safeParse(id).success) return { error: "Notifikasi tidak valid." };
   const supabase = await createClient();
   let query = supabase.from("notifications").update({ is_read: true })

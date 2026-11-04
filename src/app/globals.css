@@ -329,13 +329,13 @@
 .student-sidebar nav a { min-height: 38px; font-size: 11px; }
 .student-sidebar nav svg { width: 14px; height: 14px; }
 .student-sidebar nav ul { gap: 8px; }
-.student-panel {
+.student-panel, .app-panel {
   min-width: 0;
   border-radius: 18px;
   background: #fff;
   box-shadow: 0 3px 4px rgb(21 28 38 / 0.11);
 }
-.student-button {
+.student-button, .app-button {
   display: inline-flex;
   min-height: 38px;
   align-items: center;
@@ -349,10 +349,10 @@
   color: white;
   transition: background 150ms;
 }
-.student-button:hover { background: #d60000; }
-.student-button:disabled { cursor: not-allowed; opacity: 0.5; }
-.student-button:focus-visible, .student-tab:focus-visible { outline: 2px solid #f00000; outline-offset: 3px; }
-.student-tab {
+.student-button:hover, .app-button:hover { background: #d60000; }
+.student-button:disabled, .app-button:disabled { cursor: not-allowed; opacity: 0.5; }
+.student-button:focus-visible, .student-tab:focus-visible, .app-button:focus-visible, .app-tab:focus-visible { outline: 2px solid #f00000; outline-offset: 3px; }
+.student-tab, .app-tab {
   display: inline-flex;
   min-height: 32px;
   align-items: center;
@@ -364,9 +364,42 @@
   white-space: nowrap;
   transition: background 150ms;
 }
-.student-tab:hover { background: #eaeaec; }
-.student-tab[aria-pressed="true"] { background: #f00000; color: white; }
+.student-tab:hover, .app-tab:hover { background: #eaeaec; }
+.student-tab[aria-pressed="true"], .app-tab[aria-pressed="true"] { background: #f00000; color: white; }
 @media (min-width: 1024px) {
   .student-tab { min-height: 28px; padding: 4px 18px; }
 }
+}
+
+/* Skala panel guru, BK, dan admin mengikuti referensi desktop. */
+.staff-sidebar { padding: 38px 22px 34px; overflow-y: auto; }
+.staff-sidebar > a { font-size: 24px; }
+.staff-sidebar nav a { min-height: 44px; font-size: 12px; gap: 12px; }
+.staff-sidebar nav ul { gap: 12px; }
+.staff-sidebar nav svg { width: 17px; height: 17px; }
+.staff-app .staff-page-title, .staff-app .staff-page-description { display: none; }
+.staff-app [data-slot="card"] { border: 0; border-radius: 20px; box-shadow: 0 3px 5px rgb(21 28 38 / 0.1); }
+.staff-app [data-slot="button"] { border-radius: 999px; }
+.staff-app [data-slot="input"], .staff-app [data-slot="select-native"], .staff-app [data-slot="textarea"] { border-radius: 9px; box-shadow: none; }
+.staff-app .app-button { min-height: 36px; font-size: 13px; }
+.staff-app .app-tab { min-height: 34px; font-size: 13px; padding: 5px 20px; }
+.staff-decision-dialog::backdrop { background: rgb(16 20 24 / 0.45); backdrop-filter: blur(2px); }
+.staff-decision-dialog { position: fixed; inset: 0; margin: auto; width: min(540px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); border: 0; border-radius: 22px; padding: 0; box-shadow: 0 20px 80px rgb(0 0 0 / 0.2); }
+@media (min-width: 1024px) {
+  .staff-main, .staff-school-bar, .staff-page-header { padding-left: clamp(28px, 2.57vw, 40px); padding-right: clamp(28px, 4vw, 58px); }
+  .staff-school-bar { min-height: clamp(44px, 4.1vw, 59px); }
+  .staff-school-bar img { height: 28px; }
+  .staff-school-bar span { font-size: 12px; }
+  .staff-school-bar > span:last-child { font-size: 14px; }
+  .staff-page-header { min-height: 96px; }
+  .staff-page-header h1 { font-size: 24px; line-height: 32px; }
+  .staff-page-header p { font-size: 14px; }
+  .staff-page-header summary > span { width: 45px; height: 45px; }
+  .staff-page-header a[aria-label^="Notifikasi"] svg { width: 24px; height: 24px; }
+  .staff-app .staff-primary-action { min-height: 48px; font-size: 15px; }
+  .staff-sidebar { padding: clamp(32px, 3.6vw, 52px) clamp(18px, 2.2vw, 32px) 42px; }
+  .staff-sidebar nav a { min-height: 46px; font-size: 14px; }
+  .staff-sidebar nav ul { gap: 13px; }
+  .staff-sidebar > div:first-of-type { margin-top: 26px; }
+  .staff-sidebar > div:first-of-type > p { font-size: 12px; margin-bottom: 12px; }
 }

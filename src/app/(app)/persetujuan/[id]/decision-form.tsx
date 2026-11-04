@@ -26,6 +26,7 @@ export function DecisionForm({ requestId }: { requestId: string }) {
           id="note"
           name="note"
           rows={3}
+          maxLength={1000}
           placeholder="Wajib diisi bila menolak; opsional bila menyetujui."
         />
       </div>
@@ -45,7 +46,7 @@ export function DecisionForm({ requestId }: { requestId: string }) {
           name="_action"
           value={APPROVAL_ACTIONS.APPROVED}
           disabled={pending}
-          className="bg-emerald-700 text-white hover:bg-emerald-800"
+          className="bg-[#f00000] text-white hover:bg-red-700"
         >
           <Check className="size-4" />
           Setujui

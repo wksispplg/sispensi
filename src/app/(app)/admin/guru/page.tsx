@@ -55,8 +55,8 @@ export default async function AdminGuruPage() {
         >
           <ArrowLeft className="size-4" /> Data Master
         </Link>
-        <h1 className="text-2xl font-semibold tracking-tight">Guru</h1>
-        <p className="text-muted-foreground">
+        <h1 className="staff-page-title text-2xl font-semibold tracking-tight">Guru</h1>
+        <p className="staff-page-description text-muted-foreground">
           Buat akun guru dan atur perannya.
         </p>
       </div>

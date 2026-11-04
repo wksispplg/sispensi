@@ -46,8 +46,8 @@ export default async function AdminKelasPage() {
         >
           <ArrowLeft className="size-4" /> Data Master
         </Link>
-        <h1 className="text-2xl font-semibold tracking-tight">Kelas</h1>
-        <p className="text-muted-foreground">
+        <h1 className="staff-page-title text-2xl font-semibold tracking-tight">Kelas</h1>
+        <p className="staff-page-description text-muted-foreground">
           Kelola kelas dan tetapkan wali kelas (approver fallback).
         </p>
       </div>

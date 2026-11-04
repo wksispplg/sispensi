@@ -61,7 +61,7 @@ export default async function RekapPage({
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
+          <h1 className="staff-page-title text-2xl font-semibold tracking-tight">
             Dashboard Rekapitulasi
           </h1>
           <p className="text-muted-foreground">
@@ -287,12 +287,12 @@ function Stat({
   className?: string;
 }) {
   return (
-    <Card className="gap-1 py-4">
-      <CardContent className="flex flex-col gap-0.5">
-        <span className={cn("text-2xl font-semibold tabular-nums", className)}>
+    <Card className="gap-2 py-5">
+      <CardContent className="flex flex-col gap-2">
+        <span className="text-muted-foreground text-xs">{label}</span>
+        <span className={cn("text-[32px] leading-none font-semibold tabular-nums", className)}>
           {value}
         </span>
-        <span className="text-muted-foreground text-xs">{label}</span>
       </CardContent>
     </Card>
   );

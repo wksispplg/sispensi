@@ -37,7 +37,7 @@ function dataEnvironment() {
   const q={select(value){calls.push(["select",value]);return q;},eq(column,value){calls.push(["eq",column,value]);return q;},order(){return Promise.resolve({data:[],error:null});},update(value){calls.push(["update",value]);return q;},then(resolve){return Promise.resolve({error:null}).then(resolve);}};
   const loader=createTsLoader({
     "./pdf-preview":{PdfPreview:()=>null},
-    "@/lib/auth":{requireRole:async(...roles)=>{assert.deepEqual(roles,["siswa"]);return {id:"student-own",role:"siswa"};}},
+    "@/lib/auth":{requireRole:async(...roles)=>{assert.deepEqual(roles,["siswa"]);return {id:"student-own",role:"siswa"};},requireProfile:async()=>({id:"student-own",role:"siswa"})},
     "@/lib/supabase/server":{createClient:async()=>({from(table){calls.push(["from",table]);return q;}})},
     "next/cache":{revalidatePath(){}},
   });

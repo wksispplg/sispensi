@@ -60,7 +60,7 @@ export default async function AdminJadwalPage() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">
+        <h1 className="staff-page-title text-2xl font-semibold tracking-tight">
           Kelola Jadwal Pelajaran
         </h1>
         <p className="text-muted-foreground">

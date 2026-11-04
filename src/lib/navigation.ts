@@ -6,7 +6,6 @@ import type { LucideIcon } from "lucide-react";
 import {
   BarChart3,
   CalendarClock,
-  ClipboardList,
   History,
   House,
   Bell,
@@ -56,6 +55,22 @@ const SCAN: NavItem = {
   icon: ScanLine,
 };
 
+const NOTIFICATIONS: NavItem = {
+  href: NOTIFICATIONS_PATH,
+  label: "Notifikasi",
+  title: "Notifikasi",
+  description: "Kabar terbaru tentang pengajuan izin.",
+  icon: Bell,
+};
+
+const APPROVALS: NavItem = {
+  href: APPROVALS_PATH,
+  label: "Tinjau",
+  title: "Perlu Persetujuan",
+  description: "Tinjau pengajuan dan berikan keputusan.",
+  icon: Plus,
+};
+
 const NAV: Record<Role, NavItem[]> = {
   [ROLES.SISWA]: [
     HOME,
@@ -90,14 +105,7 @@ const NAV: Record<Role, NavItem[]> = {
   ],
   [ROLES.GURU_MAPEL]: [
     HOME,
-    SCAN,
-    {
-      href: APPROVALS_PATH,
-      label: "Persetujuan",
-      title: "Perlu Persetujuan",
-      description: "Tinjau & putuskan pengajuan izin siswa.",
-      icon: ClipboardList,
-    },
+    APPROVALS,
     {
       href: APPROVAL_HISTORY_PATH,
       label: "Riwayat",
@@ -105,17 +113,12 @@ const NAV: Record<Role, NavItem[]> = {
       description: "Lihat pengajuan yang pernah Anda proses.",
       icon: History,
     },
+    SCAN,
+    NOTIFICATIONS,
   ],
   [ROLES.WALI_KELAS]: [
     HOME,
-    SCAN,
-    {
-      href: APPROVALS_PATH,
-      label: "Persetujuan",
-      title: "Perlu Persetujuan",
-      description: "Tinjau & putuskan pengajuan izin siswa.",
-      icon: ClipboardList,
-    },
+    APPROVALS,
     {
       href: APPROVAL_HISTORY_PATH,
       label: "Riwayat",
@@ -123,16 +126,17 @@ const NAV: Record<Role, NavItem[]> = {
       description: "Lihat pengajuan yang pernah Anda proses.",
       icon: History,
     },
+    SCAN,
+    NOTIFICATIONS,
   ],
   [ROLES.GURU_BK]: [
     HOME,
-    SCAN,
     {
       href: APPROVALS_PATH,
-      label: "Persetujuan",
+      label: "Tinjau",
       title: "Perlu Persetujuan",
       description: "Tinjau izin yang ditugaskan kepada Anda dan eskalasi tahap akhir.",
-      icon: ClipboardList,
+      icon: Plus,
     },
     {
       href: APPROVAL_HISTORY_PATH,
@@ -148,13 +152,15 @@ const NAV: Record<Role, NavItem[]> = {
       description: "Rekapitulasi & tren perizinan siswa.",
       icon: BarChart3,
     },
+    SCAN,
+    NOTIFICATIONS,
   ],
   [ROLES.ADMIN]: [
     HOME,
-    SCAN,
+    APPROVALS,
     {
       href: ADMIN_HOME_PATH,
-      label: "Data Master",
+      label: "Data",
       title: "Data Master",
       description: "Kelola siswa, guru, kelas & mata pelajaran.",
       icon: Users,
@@ -173,6 +179,15 @@ const NAV: Record<Role, NavItem[]> = {
       description: "Rekapitulasi perizinan seluruh sekolah.",
       icon: BarChart3,
     },
+    {
+      href: APPROVAL_HISTORY_PATH,
+      label: "Riwayat",
+      title: "Riwayat Keputusan",
+      description: "Keputusan yang pernah Anda proses.",
+      icon: History,
+    },
+    SCAN,
+    NOTIFICATIONS,
   ],
 };
 
