@@ -153,6 +153,8 @@ export const LESSON_PERIODS = [
 // ========================================================================
 export const LOGIN_PATH = "/login";
 export const DASHBOARD_PATH = "/dashboard";
+export const STUDENT_LETTERS_PATH = "/surat-digital";
+export const NOTIFICATIONS_PATH = "/notifikasi";
 export const APPROVALS_PATH = "/persetujuan";
 export const APPROVAL_HISTORY_PATH = "/riwayat-keputusan";
 export const SCAN_PATH = "/scan";
@@ -197,6 +199,8 @@ export type StorageBucket =
 
 /** Batas berkas bukti pendukung — dipakai validasi di browser & di server. */
 export const EVIDENCE_MAX_BYTES = 5 * 1024 * 1024; // 5MB
+export const REQUEST_TITLE_MAX_LENGTH = 20;
+export const REQUEST_REASON_MAX_LENGTH = 1000;
 export const EVIDENCE_MIME_TYPES: readonly string[] = [
   "image/jpeg",
   "image/png",

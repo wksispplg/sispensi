@@ -94,6 +94,19 @@ test("nomor jam salah, kelas kosong dan guru kosong tidak menyimpan pengajuan", 
   assert.equal(calls.inserted.length,0);
 });
 
+test("alasan singkat dan detail opsional disimpan utuh untuk guru dan PDF", async () => {
+  for (const detail of ["", "Mengikuti seleksi lomba sebagai perwakilan sekolah."]) {
+    const {actions,calls}=actionEnvironment();
+    const data=form("3","5");data.set("reason","Lomba LKS");data.set("reason_detail",detail);
+    await assert.rejects(()=>actions.createPermissionRequest({},data),/REDIRECT/);
+    assert.equal(calls.inserted[0].reason,detail?`Lomba LKS\n${detail}`:"Lomba LKS");
+  }
+  for (const [title,detail] of [["Judul terlalu panjang untuk form ini",""],["Hai","Detail yang panjang"],["Lomba LKS","a".repeat(1000)]]) {
+    const {actions,calls}=actionEnvironment();const data=form();data.set("reason",title);data.set("reason_detail",detail);
+    assert.ok((await actions.createPermissionRequest({},data)).error);assert.equal(calls.uploads,0);
+  }
+});
+
 const link=({children,href,...props})=>React.createElement("a",{href,...props},children);
 test("form siswa menampilkan 11 pilihan dan tidak memiliki tanggal bebas", () => {
   const loader=createTsLoader({"next/link":link,"./actions":{},"@/hooks/use-form-action":{useFormAction:()=>[{}, {}, false]}});

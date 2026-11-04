@@ -49,7 +49,7 @@ export async function GET(
   return new NextResponse(Buffer.from(result.bytes), {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="${result.filename}"`,
+      "Content-Disposition": `${new URL(request.url).searchParams.get("preview") === "1" ? "inline" : "attachment"}; filename="${result.filename}"`,
       "Content-Length": String(result.bytes.byteLength),
       "X-Content-Type-Options": "nosniff",
       "Cache-Control": "private, no-store",

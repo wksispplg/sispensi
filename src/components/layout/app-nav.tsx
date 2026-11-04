@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LogOut } from "lucide-react";
 
-import { DASHBOARD_PATH, ROLE_LABELS, type Role } from "@/lib/constants";
+import { DASHBOARD_PATH, ROLE_LABELS, ROLES, type Role } from "@/lib/constants";
 import { activeNavHref, navItemsForRole } from "@/lib/navigation";
 import { cn } from "@/lib/utils";
 
@@ -15,10 +15,10 @@ export function DesktopNav({ role }: { role: Role }) {
   const active = activeNavHref(pathname, items);
 
   return (
-    <aside className="fixed inset-y-0 left-0 z-30 hidden w-[212px] flex-col bg-white px-4 pt-8 pb-6 lg:flex xl:w-60">
+    <aside className={cn("fixed inset-y-0 left-0 z-30 hidden w-[212px] flex-col bg-white px-4 pt-8 pb-6 lg:flex xl:w-60", role === ROLES.SISWA && "student-sidebar w-[214px] xl:w-[214px]")}>
       <Link
         href={DASHBOARD_PATH}
-        aria-label="SisPensi — Home"
+        aria-label={role === ROLES.SISWA ? "SisPensi — Beranda" : "SisPensi — Home"}
         className="text-brand w-fit rounded-sm text-xl font-semibold tracking-tight outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
       >
         SisPensi
@@ -46,7 +46,7 @@ export function DesktopNav({ role }: { role: Role }) {
                     )}
                   >
                     <Icon className="size-4 shrink-0" strokeWidth={1.5} aria-hidden />
-                    {item.href === DASHBOARD_PATH ? "Home" : item.title}
+                    {item.href === DASHBOARD_PATH && role !== ROLES.SISWA ? "Home" : item.title}
                   </Link>
                 </li>
               );

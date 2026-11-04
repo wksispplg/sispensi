@@ -1,14 +1,20 @@
 import Link from "next/link";
 
 import { getProfile } from "@/lib/auth";
-import { DASHBOARD_PATH, ROLE_LABELS } from "@/lib/constants";
+import { DASHBOARD_PATH, ROLE_LABELS, ROLES } from "@/lib/constants";
 import { navItemsForRole } from "@/lib/navigation";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { HomeWelcome } from "./home-welcome";
+import { getStudentDashboard } from "@/features/izin/student-data";
+import { StudentDashboard } from "./student-dashboard";
 
 export default async function DashboardPage() {
   const profile = await getProfile();
   if (!profile) return null;
+  if (profile.role === ROLES.SISWA) {
+    const data = await getStudentDashboard(profile.id);
+    return <StudentDashboard profile={profile} {...data} />;
+  }
   const firstName = (profile.full_name ?? "").trim().split(/\s+/)[0] || "Pengguna";
   const fullName = profile.full_name?.trim() || "Pengguna";
   const tiles = navItemsForRole(profile.role).filter((item) => item.href !== DASHBOARD_PATH);

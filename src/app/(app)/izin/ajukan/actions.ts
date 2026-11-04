@@ -15,6 +15,8 @@ import {
   IZIN_TYPES,
   IZIN_TYPE_LABELS,
   REQUEST_STATUS,
+  REQUEST_TITLE_MAX_LENGTH,
+  REQUEST_REASON_MAX_LENGTH,
   ROLES,
   STORAGE_BUCKETS,
   type IzinType,
@@ -28,7 +30,7 @@ const requestSchema = z.object({
     .string()
     .trim()
     .min(5, "Alasan minimal 5 karakter")
-    .max(1000, "Alasan maksimal 1000 karakter"),
+    .max(REQUEST_REASON_MAX_LENGTH, "Alasan maksimal 1000 karakter"),
   lesson_period_start: z.coerce.number().int().min(1, "Pilih jam pelajaran awal.").max(11),
   lesson_period_end: z.coerce.number().int().min(1, "Pilih jam pelajaran akhir.").max(11),
 }).refine((value) => value.lesson_period_end >= value.lesson_period_start, { message: "Jam pelajaran akhir tidak boleh sebelum jam awal.", path: ["lesson_period_end"] });
@@ -45,9 +47,21 @@ export async function createPermissionRequest(
     return { error: "Hanya siswa yang dapat mengajukan izin." };
   }
 
+  const rawTitle = formData.get("reason");
+  const rawDetail = formData.get("reason_detail");
+  if (typeof rawTitle !== "string" || (rawDetail !== null && typeof rawDetail !== "string")) return { error: "Alasan tidak valid." };
+  const title = rawTitle.trim();
+  const detail = (rawDetail ?? "").trim();
+  if (formData.has("reason_detail") && title.length < 5) return { error: "Alasan singkat minimal 5 karakter." };
+  if (formData.has("reason_detail") && title.length > REQUEST_TITLE_MAX_LENGTH) {
+    return { error: `Alasan singkat maksimal ${REQUEST_TITLE_MAX_LENGTH} karakter.` };
+  }
+  const reason = detail ? `${title}\n${detail}` : title;
+  if (reason.length > REQUEST_REASON_MAX_LENGTH) return { error: `Alasan dan detail maksimal ${REQUEST_REASON_MAX_LENGTH} karakter.` };
+
   const parsed = requestSchema.safeParse({
     izin_type: formData.get("izin_type"),
-    reason: formData.get("reason"),
+    reason,
     lesson_period_start: formData.get("lesson_period_start"),
     lesson_period_end: formData.get("lesson_period_end"),
   });
@@ -128,6 +142,7 @@ export async function createPermissionRequest(
   }
 
   revalidatePath("/izin");
+  revalidatePath("/dashboard");
   revalidatePath("/persetujuan");
   redirect("/izin?ok=1");
 }

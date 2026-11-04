@@ -2,113 +2,30 @@
 
 import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
-import {
-  ArrowLeft,
-  CalendarClock,
-  CheckCircle2,
-  FileCheck2,
-  FileText,
-  Send,
-  UploadCloud,
-  UserRound,
-} from "lucide-react";
+import { Check, Upload } from "lucide-react";
 
-import {
-  createPermissionRequest,
-  lookupSchedule,
-  type CreateState,
-  type LookupResult,
-} from "./actions";
-import {
-  EVIDENCE_MAX_BYTES,
-  EVIDENCE_MIME_TYPES,
-  IZIN_TYPE_LABELS,
-  LESSON_PERIODS,
-  type IzinType,
-} from "@/lib/constants";
+import { createPermissionRequest, lookupSchedule, type CreateState, type LookupResult } from "./actions";
+import { EVIDENCE_MAX_BYTES, EVIDENCE_MIME_TYPES, IZIN_TYPE_LABELS, LESSON_PERIODS, REQUEST_TITLE_MAX_LENGTH, REQUEST_REASON_MAX_LENGTH } from "@/lib/constants";
 import { useFormAction } from "@/hooks/use-form-action";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
 import { lessonPeriodLabel, lessonRangeLabel } from "@/features/izin/lesson-periods";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { SelectNative } from "@/components/ui/select-native";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 
 const initialState: CreateState = {};
-
-function SchedulePreview({
-  preview,
-  pending,
-}: {
-  preview: LookupResult | null;
-  pending: boolean;
-}) {
-  return (
-    <div className="min-w-0 text-sm leading-relaxed wrap-anywhere" aria-live="polite">
-      {preview?.status === "choose_period" && !pending ? (
-        <p className="text-muted-foreground">Pilih jam pelajaran untuk melihat guru penanggung jawab.</p>
-      ) : preview?.status === "error" && !pending ? (
-        <p className="text-destructive">{preview.message}</p>
-      ) : !preview || pending ? (
-        <p className="text-muted-foreground">Memuat jadwal…</p>
-      ) : preview?.status === "found" ? (
-        <div className="flex items-start gap-2">
-          <CalendarClock className="text-primary mt-0.5 size-4 shrink-0" />
-          <div className="min-w-0">
-            <p className="font-medium">{preview.subject ?? "Mata pelajaran"}</p>
-            <p className="text-muted-foreground text-xs">
-              {preview.day} · Jam ke-{preview.period} ({preview.start}–
-              {preview.end})
-              {preview.teacher ? ` · ${preview.teacher}` : ""}
-            </p>
-            <p className="text-muted-foreground mt-0.5 text-xs">
-              Izin akan diproses guru tersebut (Lapis 1).
-            </p>
-          </div>
-        </div>
-      ) : preview?.status === "fallback" && !preview.approver ? (
-        <p className="text-destructive">Guru untuk jam pelajaran ini dan wali kelas belum tersedia. Hubungi Admin sebelum mengirim pengajuan.</p>
-      ) : preview?.status === "fallback" ? (
-        <p className="text-muted-foreground">
-          Tidak ada jadwal guru pada jam pelajaran yang dipilih ({preview.day}) — izin diproses{" "}
-          <span className="text-foreground font-medium">Wali Kelas</span>
-          {preview.approver ? ` (${preview.approver})` : ""}.
-        </p>
-      ) : preview?.status === "no_class" ? (
-        <p className="text-muted-foreground">
-          Anda belum terdaftar di kelas — hubungi Admin agar izin bisa
-          diarahkan.
-        </p>
-      ) : null}
-    </div>
-  );
-}
+const fieldClass = "h-11 rounded-lg border-[#a5a7ae] bg-white text-base shadow-none md:h-8 md:text-[11px]";
 
 export default function AjukanIzinPage() {
-  const [state, formProps, pending] = useFormAction(
-    createPermissionRequest,
-    initialState,
-  );
-
-  const [izinType, setIzinType] = useState("");
+  const [state, formProps, pending] = useFormAction(createPermissionRequest, initialState);
   const [startPeriod, setStartPeriod] = useState("");
   const [endPeriod, setEndPeriod] = useState("");
-  const [reason, setReason] = useState("");
-  const [evidence, setEvidence] = useState<{
-    name: string;
-    size: number;
-  } | null>(null);
+  const [evidence, setEvidence] = useState<{ name: string; size: number } | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const [preview, setPreview] = useState<LookupResult | null>(null);
   const [previewPending, startPreview] = useTransition();
 
-  // Pratinjau memakai nomor jam sekolah, bukan urutan baris jadwal guru.
   useEffect(() => {
     let active = true;
     const handle = setTimeout(() => {
@@ -117,251 +34,104 @@ export default function AjukanIzinPage() {
         if (active) setPreview(result);
       });
     }, 350);
-    return () => {
-      active = false;
-      clearTimeout(handle);
-    };
+    return () => { active = false; clearTimeout(handle); };
   }, [startPeriod]);
 
-  const timeLabel = lessonRangeLabel(Number(startPeriod), Number(endPeriod)) ?? "Belum dipilih";
+  const canSubmit = !pending && !previewPending && !!startPeriod && !!endPeriod && !!preview && (preview.status === "found" || (preview.status === "fallback" && !!preview.approver));
+  const timeLabel = lessonRangeLabel(Number(startPeriod), Number(endPeriod));
 
-  return (
-    <div className="flex w-full min-w-0 flex-col gap-5 pt-2 lg:pt-4">
-      <Link
-        href="/izin"
-        className="text-muted-foreground hover:text-foreground inline-flex w-fit items-center gap-1 text-sm"
-      >
-        <ArrowLeft className="size-4" aria-hidden />
-        Kembali ke riwayat
-      </Link>
-
-      <form
-        {...formProps}
-        className="grid min-w-0 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_260px] xl:grid-cols-[minmax(0,1fr)_300px] 2xl:grid-cols-[minmax(0,1fr)_320px]"
-      >
-        <Card className="gap-0 overflow-hidden rounded-2xl border-zinc-200 py-0 shadow-none">
-          <CardHeader className="flex flex-row items-start gap-3 border-b border-zinc-100 p-5 sm:p-6">
-            <span className="bg-brand/8 text-brand flex size-10 shrink-0 items-center justify-center rounded-xl">
-              <FileText className="size-5" strokeWidth={1.7} aria-hidden />
-            </span>
-            <div className="min-w-0">
-              <CardTitle className="text-base leading-6">Detail pengajuan</CardTitle>
-              <p className="text-muted-foreground mt-1 text-sm leading-relaxed">
-                Lengkapi informasi izin dan lampirkan bukti pendukung.
-              </p>
-            </div>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-6 p-5 sm:p-6">
-            <div className="flex min-w-0 flex-col gap-5">
-              <div className="flex min-w-0 flex-col gap-2">
-                <Label htmlFor="izin_type">
-                  Jenis izin <span className="text-destructive">*</span>
-                </Label>
-                <SelectNative
-                  id="izin_type"
-                  name="izin_type"
-                  required
-                  className="h-12 rounded-xl border-zinc-200 bg-white shadow-none md:h-12"
-                  value={izinType}
-                  onChange={(e) => setIzinType(e.target.value)}
-                >
-                  <option value="" disabled>
-                    Pilih jenis izin…
-                  </option>
-                  {Object.entries(IZIN_TYPE_LABELS).map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </SelectNative>
-              </div>
-            </div>
-            <div className="grid min-w-0 gap-5 sm:grid-cols-2">
-              <div className="flex min-w-0 flex-col gap-2">
-                <Label htmlFor="lesson_period_start">Dari jam pelajaran <span className="text-destructive">*</span></Label>
-                <SelectNative
-                  id="lesson_period_start"
-                  name="lesson_period_start"
-                  required
-                  className="h-12 rounded-xl border-zinc-200 bg-white shadow-none md:h-12"
-                  value={startPeriod}
-                  onChange={(e) => { const value = e.target.value; setStartPeriod(value); if (endPeriod && Number(endPeriod) < Number(value)) setEndPeriod(""); setPreview(null); }}
-                >
-                  <option value="" disabled>Pilih jam pelajaran…</option>
-                  {LESSON_PERIODS.map((period) => <option key={period.number} value={period.number}>{lessonPeriodLabel(period.number)}</option>)}
-                </SelectNative>
-                <p className="text-muted-foreground text-xs">
-                  Berlaku untuk hari ini (WIB). Waktu istirahat tidak dihitung sebagai jam pelajaran.
-                </p>
-              </div>
-            <div className="flex min-w-0 flex-col gap-2">
-              <Label htmlFor="lesson_period_end">Sampai jam pelajaran <span className="text-destructive">*</span></Label>
-              <SelectNative id="lesson_period_end" name="lesson_period_end" required value={endPeriod} onChange={(e) => setEndPeriod(e.target.value)} disabled={!startPeriod} className="h-12 rounded-xl border-zinc-200 bg-white shadow-none md:h-12">
-                <option value="" disabled>Pilih jam pelajaran akhir…</option>
-                {LESSON_PERIODS.filter((period) => period.number >= Number(startPeriod)).map((period) => <option key={period.number} value={period.number}>{lessonPeriodLabel(period.number)}</option>)}
-              </SelectNative>
-              <p className="text-muted-foreground text-xs">Guru penanggung jawab mengikuti jadwal pada jam awal.</p>
-            </div>
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center justify-between gap-3">
-                <Label htmlFor="reason">
-                  Alasan izin <span className="text-destructive">*</span>
-                </Label>
-                <span className="text-muted-foreground text-xs tabular-nums">
-                  {reason.length}/1000
-                </span>
-              </div>
-              <Textarea
-                id="reason"
-                name="reason"
-                required
-                minLength={5}
-                maxLength={1000}
-                rows={4}
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                className="min-h-36 resize-y rounded-xl border-zinc-200 bg-white p-3.5 leading-relaxed shadow-none"
-                placeholder="Jelaskan keperluan Anda secara singkat dan jelas…"
-              />
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="evidence">
-                Bukti pendukung <span className="text-destructive">*</span>
-              </Label>
-              <div
-                className={cn(
-                  "relative rounded-xl border border-dashed p-5 transition-colors focus-within:ring-2 focus-within:ring-brand/30 sm:p-6",
-                  fileError
-                    ? "border-destructive bg-red-50/40"
-                    : "border-zinc-300 bg-zinc-50/70 hover:border-brand/50 hover:bg-red-50/30",
-                )}
-              >
-                <input
-                  id="evidence"
-                  name="evidence"
-                  type="file"
-                  accept={EVIDENCE_MIME_TYPES.join(",")}
-                  required
-                  aria-invalid={fileError ? true : undefined}
-                  aria-describedby={fileError ? "evidence-hint evidence-error" : "evidence-hint"}
-                  className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                  onChange={(e) => {
-                    // Cek di browser dulu agar file besar tidak sempat diunggah.
-                    const f = e.currentTarget.files?.[0];
-                    const msg = !f
-                      ? ""
-                      : f.size > EVIDENCE_MAX_BYTES
-                        ? `Ukuran file ${(f.size / 1048576).toFixed(1)}MB — maksimal 5MB.`
-                        : !EVIDENCE_MIME_TYPES.includes(f.type)
-                          ? "Format harus JPG, PNG, WebP, atau PDF."
-                          : "";
-                    e.currentTarget.setCustomValidity(msg);
-                    setFileError(msg || null);
-                    setEvidence(f ? { name: f.name, size: f.size } : null);
-                  }}
-                />
-                <div aria-hidden className="pointer-events-none flex min-w-0 flex-col items-center gap-2 text-center">
-                  <span className={cn(
-                    "flex size-11 items-center justify-center rounded-xl bg-white",
-                    evidence && !fileError ? "text-emerald-600" : "text-brand",
-                  )}>
-                    {evidence && !fileError ? (
-                      <CheckCircle2 className="size-5" />
-                    ) : (
-                      <UploadCloud className="size-5" />
-                    )}
-                  </span>
-                  <p className="max-w-full text-sm font-medium wrap-anywhere">
-                    {evidence?.name ?? "Klik untuk memilih bukti pendukung"}
-                  </p>
-                  <p className="text-muted-foreground text-xs">
-                    {evidence ? `${(evidence.size / 1048576).toFixed(2)} MB · Klik untuk mengganti berkas` : "JPG, PNG, WebP, atau PDF · Maksimal 5 MB"}
-                  </p>
-                </div>
-              </div>
-              {fileError ? (
-                <p id="evidence-error" role="alert" className="text-destructive text-sm">
-                  {fileError}
-                </p>
-              ) : null}
-              <p id="evidence-hint" className="text-muted-foreground text-xs">
-                Lampirkan dokumen atau foto yang mendukung alasan izin Anda.
-              </p>
-            </div>
-
-            {state.error ? (
-              <p
-                role="alert"
-                className="bg-destructive/10 text-destructive rounded-md px-3 py-2 text-sm"
-              >
-                {state.error}
-              </p>
-            ) : null}
-          </CardContent>
-          <div className="flex flex-col gap-4 border-t border-zinc-100 bg-zinc-50/70 px-5 py-4 sm:px-6">
-            <p className="text-muted-foreground text-xs leading-relaxed">
-              Pastikan informasi sudah benar sebelum mengirim pengajuan.
-            </p>
-            <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-              <Button type="button" variant="outline" asChild className="h-11 rounded-xl bg-white px-5 md:h-11">
-                <Link href="/izin">Batal</Link>
-              </Button>
-              <Button type="submit" disabled={pending || previewPending || !startPeriod || !endPeriod || !preview || preview.status === "error" || preview.status === "no_class" || (preview.status === "fallback" && !preview.approver)} className="h-11 rounded-xl px-5 md:h-11">
-                <Send className="size-4" aria-hidden />
-                {pending ? "Mengirim…" : "Kirim Pengajuan"}
-              </Button>
-            </div>
+  return <div className="grid min-w-0 items-start gap-5 pt-2 lg:grid-cols-[minmax(0,1.85fr)_minmax(240px,1fr)] lg:pt-3">
+    <form {...formProps} className="student-panel flex min-w-0 flex-col gap-3.5 p-5 sm:p-7">
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="reason" className="text-[11px] font-medium">Alasan</Label>
+        <Input id="reason" name="reason" required minLength={5} maxLength={REQUEST_TITLE_MAX_LENGTH} placeholder="Tulis alasan maks. 20 karakter" className={fieldClass} />
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="reason_detail" className="text-[11px] font-medium">Detail alasan <span className="font-normal">(opsional)</span></Label>
+        <Textarea id="reason_detail" name="reason_detail" rows={2} maxLength={REQUEST_REASON_MAX_LENGTH - REQUEST_TITLE_MAX_LENGTH - 1} placeholder="Jelaskan alasan kamu…" className="min-h-14 resize-y rounded-lg border-[#a5a7ae] bg-white text-base shadow-none md:text-[11px]" />
+      </div>
+      <div className="flex max-w-xs flex-col gap-2">
+        <Label htmlFor="izin_type" className="text-[11px] font-medium">Jenis izin</Label>
+        <SelectNative id="izin_type" name="izin_type" required defaultValue="" className={fieldClass}>
+          <option value="" disabled>Pilih jenis izin…</option>
+          {Object.entries(IZIN_TYPE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+        </SelectNative>
+      </div>
+      <fieldset className="min-w-0">
+        <legend className="mb-2 text-[11px] font-medium">Jam mapel</legend>
+        <div className="grid min-w-0 gap-3 sm:grid-cols-2">
+          <div className="min-w-0">
+            <Label htmlFor="lesson_period_start" className="sr-only">Dari jam pelajaran</Label>
+            <SelectNative id="lesson_period_start" name="lesson_period_start" required value={startPeriod} className={fieldClass}
+              onChange={(event) => { const value = event.target.value; setStartPeriod(value); if (endPeriod && Number(endPeriod) < Number(value)) setEndPeriod(""); setPreview(null); }}>
+              <option value="" disabled>Pilih jam mapel mulai</option>
+              {LESSON_PERIODS.map((period) => <option key={period.number} value={period.number}>{lessonPeriodLabel(period.number)}</option>)}
+            </SelectNative>
           </div>
-        </Card>
-
-        <aside className="flex min-w-0 flex-col gap-4 lg:sticky lg:top-6" aria-label="Ringkasan dan informasi pengajuan">
-          <Card className="gap-4 rounded-2xl border-zinc-200 py-5 shadow-none">
-            <CardHeader className="gap-2 px-5">
-              <p className="text-brand text-[10px] font-semibold tracking-wider uppercase">
-                {pending ? "Sedang dikirim" : "Belum dikirim"}
-              </p>
-              <CardTitle className="text-base leading-6">Ringkasan izin</CardTitle>
-            </CardHeader>
-            <CardContent className="px-5">
-              <dl className="flex flex-col gap-4 text-sm">
-                <SummaryItem label="Jenis izin" value={IZIN_TYPE_LABELS[izinType as IzinType] || "Belum dipilih"} />
-                <SummaryItem label="Jam pelajaran (hari ini)" value={timeLabel} />
-                <SummaryItem label="Bukti pendukung" value={fileError ? "Periksa kembali lampiran" : evidence?.name || "Belum dilampirkan"} />
-              </dl>
-            </CardContent>
-          </Card>
-
-          <Card className="gap-3 rounded-2xl border-zinc-200 py-5 shadow-none">
-            <CardHeader className="flex flex-row items-center gap-2 px-5">
-              <UserRound className="text-brand size-4 shrink-0" aria-hidden />
-              <CardTitle className="text-sm leading-5">Penanggung jawab</CardTitle>
-            </CardHeader>
-            <CardContent className="px-5">
-              <SchedulePreview preview={preview} pending={previewPending} />
-            </CardContent>
-          </Card>
-
-          <div className="flex items-start gap-2.5 px-1 text-sm">
-            <FileCheck2 className="text-brand mt-0.5 size-4 shrink-0" aria-hidden />
-            <p className="text-muted-foreground text-xs leading-relaxed">
-              Pantau status di <Link href="/izin" className="text-foreground font-medium underline-offset-4 hover:underline">Riwayat Pengajuan</Link>.
-              Jika disetujui, surat izin dapat diunduh dari sana.
-            </p>
+          <div className="min-w-0">
+            <Label htmlFor="lesson_period_end" className="sr-only">Sampai jam pelajaran</Label>
+            <SelectNative id="lesson_period_end" name="lesson_period_end" required value={endPeriod} disabled={!startPeriod} onChange={(event) => setEndPeriod(event.target.value)} className={fieldClass}>
+              <option value="" disabled>Pilih jam mapel selesai</option>
+              {LESSON_PERIODS.filter((period) => period.number >= Number(startPeriod)).map((period) => <option key={period.number} value={period.number}>{lessonPeriodLabel(period.number)}</option>)}
+            </SelectNative>
           </div>
-        </aside>
-      </form>
-    </div>
-  );
+        </div>
+        <p className="mt-2 text-[10px] leading-relaxed text-[#6f7380]">Berlaku untuk hari ini (WIB). Jam istirahat tidak dihitung.</p>
+        {timeLabel ? <p className="mt-1 text-[11px] text-[#555d65]">{timeLabel}</p> : null}
+      </fieldset>
+      <div className="flex min-w-0 flex-col gap-2">
+        <Label htmlFor="evidence" className="text-[11px] font-medium">Bukti pendukung <span className="text-[#f00000]">*</span></Label>
+        <div className={cn("relative min-w-0 rounded-lg border border-dashed px-4 py-4 focus-within:ring-2 focus-within:ring-red-200", fileError ? "border-red-500 bg-red-50" : "border-[#a5a7ae] hover:border-red-400")}>
+          <input id="evidence" name="evidence" type="file" accept={EVIDENCE_MIME_TYPES.join(",")} required aria-invalid={!!fileError} aria-describedby={fileError || evidence ? "evidence-hint evidence-state" : "evidence-hint"} className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+            onChange={(event) => {
+              const file = event.currentTarget.files?.[0];
+              const message = !file ? "" : file.size > EVIDENCE_MAX_BYTES ? "Ukuran bukti maksimal 5 MB." : !EVIDENCE_MIME_TYPES.includes(file.type) ? "Format harus JPG, PNG, WebP, atau PDF." : "";
+              event.currentTarget.setCustomValidity(message);
+              setFileError(message || null); setEvidence(file ? { name: file.name, size: file.size } : null);
+            }} />
+          <div aria-hidden className="pointer-events-none flex min-w-0 items-center justify-center gap-2 text-[11px] text-[#6f7380]">
+            <span className="min-w-0 truncate">{evidence?.name ?? "Unggah screenshot chat atau bukti lainnya"}</span>
+            {evidence && !fileError ? <Check className="size-4 shrink-0 text-green-600" /> : <Upload className="size-4 shrink-0 text-[#f00000]" />}
+          </div>
+        </div>
+        <p id="evidence-hint" className="text-[10px] text-[#6f7380]">JPG, PNG, WebP, atau PDF, maksimal 5 MB.</p>
+        {fileError || evidence ? <p id="evidence-state" role={fileError ? "alert" : "status"} className={cn("text-xs wrap-anywhere", fileError ? "text-red-600" : "text-[#6f7380]")}>{fileError ?? (evidence ? `${evidence.name} · ${(evidence.size / 1048576).toFixed(2)} MB` : "")}</p> : null}
+      </div>
+      {state.error ? <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{state.error}</p> : null}
+      <div className="flex flex-wrap gap-2">
+        <button type="submit" className="student-button" disabled={!canSubmit}>{pending ? "Mengirim…" : "Kirim Pengajuan"}</button>
+        <Link href="/izin" className="inline-flex min-h-[38px] items-center justify-center rounded-full border border-zinc-700 px-6 text-xs hover:bg-zinc-50">Batal</Link>
+      </div>
+    </form>
+    <aside aria-label="Informasi persetujuan" className="flex min-w-0 flex-col gap-5">
+      <section className="student-panel p-5 sm:p-6">
+        <h2 className="mb-3 text-xs font-semibold">Diproses oleh</h2>
+        <ol className="divide-y divide-[#eceef2] text-xs">
+          <li className="py-2 text-[#52a800]">{preview?.status === "fallback" ? "Wali kelas" : "Guru mata pelajaran"}<span className="float-right text-[10px]">Lapis 1</span></li>
+          <li className="py-2 text-[#6f7380]">Wali kelas<span className="float-right text-[10px]">Lapis 2</span></li>
+          <li className="py-2 text-[#6f7380]">Guru BK / Kesiswaan<span className="float-right text-[10px]">Lapis 3</span></li>
+        </ol>
+        <div aria-live="polite" className="mt-3 text-[11px] leading-relaxed text-[#6f7380]">
+          <SchedulePreview preview={preview} pending={previewPending} />
+        </div>
+      </section>
+      <section className="student-panel p-5 sm:p-6">
+        <h2 className="mb-3 text-xs font-semibold">Setelah dikirim</h2>
+        <ol className="list-decimal space-y-1 pl-4 text-xs leading-relaxed text-[#6f7380]">
+          <li>Guru memeriksa pengajuan.</li>
+          <li>Status diperbarui setelah keputusan guru.</li>
+          <li>Surat PDF ber-QR terbit jika disetujui.</li>
+        </ol>
+        <p className="mt-3 text-[10px] leading-relaxed text-[#6f7380]">Pengajuan diteruskan ke lapis berikutnya apabila belum ditanggapi.</p>
+      </section>
+    </aside>
+  </div>;
 }
 
-function SummaryItem({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="min-w-0">
-      <dt className="text-muted-foreground text-xs">{label}</dt>
-      <dd className="mt-1 font-medium leading-relaxed wrap-anywhere">{value}</dd>
-    </div>
-  );
+function SchedulePreview({ preview, pending }: { preview: LookupResult | null; pending: boolean }) {
+  if (pending) return <p>Memuat jadwal…</p>;
+  if (!preview || preview.status === "choose_period") return <p>Pilih jam pelajaran untuk melihat guru penanggung jawab.</p>;
+  if (preview.status === "found") return <p><span className="font-medium text-[#343b41]">{preview.teacher}</span><br />{preview.subject} · {preview.day}<br />Guru mengikuti jadwal pada jam awal.</p>;
+  if (preview.status === "fallback") return <p className={preview.approver ? undefined : "text-red-600"}>{preview.approver ? `Tidak ada jadwal guru pada jam awal. Pengajuan diproses wali kelas: ${preview.approver}.` : "Guru dan wali kelas belum tersedia. Hubungi Admin sebelum mengajukan izin."}</p>;
+  return <p className="text-red-600">{preview.status === "error" ? preview.message : "Anda belum terdaftar di kelas. Hubungi Admin."}</p>;
 }

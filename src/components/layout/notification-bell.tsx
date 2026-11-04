@@ -7,7 +7,7 @@ import { Bell, CheckCheck } from "lucide-react";
 import { toast } from "sonner";
 
 import { createClient } from "@/lib/supabase/client";
-import { ROLES, type Role } from "@/lib/constants";
+import { ROLES, NOTIFICATIONS_PATH, type Role } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -23,6 +23,7 @@ type Notif = {
 const timeFmt = new Intl.DateTimeFormat("id-ID", {
   dateStyle: "short",
   timeStyle: "short",
+  timeZone: "Asia/Jakarta",
 });
 
 /** Bunyi "ding" dua nada via Web Audio. */
@@ -58,11 +59,10 @@ export function NotificationBell({
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
   const [items, setItems] = useState<Notif[]>([]);
+  const [unread, setUnread] = useState(0);
   const [open, setOpen] = useState(false);
   const audioRef = useRef<AudioContext | null>(null);
   const dingPendingRef = useRef(false);
-
-  const unread = items.filter((i) => !i.is_read).length;
 
   // Muat notifikasi awal.
   useEffect(() => {
@@ -70,15 +70,19 @@ export function NotificationBell({
     supabase
       .from("notifications")
       .select("id, title, message, is_read, request_id, created_at")
+      .eq("user_id", userId)
       .order("created_at", { ascending: false })
       .limit(20)
       .then(({ data }) => {
         if (active && data) setItems(data);
       });
+    supabase.from("notifications").select("id", { count: "exact", head: true })
+      .eq("user_id", userId).eq("is_read", false)
+      .then(({ count }) => { if (active && count !== null) setUnread(count); });
     return () => {
       active = false;
     };
-  }, [supabase]);
+  }, [supabase, userId]);
 
   // Buka kunci audio pada interaksi apa pun (kebijakan autoplay browser) dan
   // selalu resume bila context sempat ter-suspend (mis. tab di-background).
@@ -134,13 +138,22 @@ export function NotificationBell({
       .on(
         "postgres_changes",
         {
-          event: "INSERT",
+          event: "*",
           schema: "public",
           table: "notifications",
           filter: `user_id=eq.${userId}`,
         },
         (payload) => {
+          if (payload.eventType !== "INSERT") {
+            const updated = payload.new as Notif;
+            if (payload.eventType === "UPDATE") setItems((previous) => previous.map((item) => item.id === updated.id ? updated : item));
+            supabase.from("notifications").select("id", { count: "exact", head: true })
+              .eq("user_id", userId).eq("is_read", false)
+              .then(({ count }) => { if (count !== null) setUnread(count); });
+            return;
+          }
           const n = payload.new as Notif;
+          if (!n.is_read) setUnread((previous) => previous + 1);
           setItems((prev) =>
             prev.some((i) => i.id === n.id) ? prev : [n, ...prev].slice(0, 30),
           );
@@ -162,17 +175,23 @@ export function NotificationBell({
   }, [supabase, userId, router]);
 
   async function markRead(id: string) {
+    const { error } = await supabase.from("notifications").update({ is_read: true }).eq("id", id).eq("user_id", userId);
+    if (error) { toast.error("Notifikasi belum dapat ditandai dibaca."); return; }
     setItems((prev) =>
       prev.map((i) => (i.id === id ? { ...i, is_read: true } : i)),
     );
-    await supabase.from("notifications").update({ is_read: true }).eq("id", id);
+    const { count } = await supabase.from("notifications").select("id", { count: "exact", head: true }).eq("user_id", userId).eq("is_read", false);
+    if (count !== null) setUnread(count);
   }
 
   async function markAll() {
     const ids = items.filter((i) => !i.is_read).map((i) => i.id);
     if (ids.length === 0) return;
+    const { error } = await supabase.from("notifications").update({ is_read: true }).in("id", ids).eq("user_id", userId);
+    if (error) { toast.error("Notifikasi belum dapat ditandai dibaca."); return; }
     setItems((prev) => prev.map((i) => ({ ...i, is_read: true })));
-    await supabase.from("notifications").update({ is_read: true }).in("id", ids);
+    const { count } = await supabase.from("notifications").select("id", { count: "exact", head: true }).eq("user_id", userId).eq("is_read", false);
+    if (count !== null) setUnread(count);
   }
 
   function hrefFor(n: Notif): string | null {
@@ -181,6 +200,11 @@ export function NotificationBell({
       ? `/izin/${n.request_id}`
       : `/persetujuan/${n.request_id}`;
   }
+
+  if (role === ROLES.SISWA) return <Link href={NOTIFICATIONS_PATH} aria-label={`Notifikasi${unread ? ` (${unread} belum dibaca)` : ""}`} className="relative flex size-10 items-center justify-center rounded-full hover:bg-zinc-200/50 focus-visible:outline-2 focus-visible:outline-red-300">
+    <Bell className="size-5" strokeWidth={1.6} aria-hidden />
+    {unread > 0 ? <span className="absolute top-0 right-0 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#f00000] px-1 text-[9px] text-white">{unread > 9 ? "9+" : unread}</span> : null}
+  </Link>;
 
   return (
     <div className="relative">

@@ -2,16 +2,18 @@
 
 import type { ReactNode } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { ChevronDown, GraduationCap, LogOut } from "lucide-react";
 
-import { DASHBOARD_PATH, ROLE_LABELS } from "@/lib/constants";
+import { DASHBOARD_PATH, ROLE_LABELS, ROLES, STUDENT_LETTERS_PATH, NOTIFICATIONS_PATH } from "@/lib/constants";
 import { activeNavHref, navItemsForRole } from "@/lib/navigation";
 import { cn } from "@/lib/utils";
 import type { Profile } from "@/types";
 import { Button } from "@/components/ui/button";
 import { DesktopNav, MobileNav } from "./app-nav";
 import { NotificationBell } from "./notification-bell";
+import { schoolTerm } from "./school-term";
 
 export function AppShell({
   profile,
@@ -28,6 +30,10 @@ export function AppShell({
   const title = isHome
     ? "Home"
     : (items.find((item) => item.href === active)?.title ?? "SisPensi");
+
+  if (profile.role === ROLES.SISWA) {
+    return <StudentShell profile={profile} pathname={pathname}>{children}</StudentShell>;
+  }
 
   return (
     <div className="min-h-svh flex-1 lg:bg-[#f5f6f8]">
@@ -94,6 +100,41 @@ export function AppShell({
       </div>
     </div>
   );
+}
+
+function StudentShell({ profile, pathname, children }: { profile: Profile; pathname: string; children: ReactNode }) {
+  const pages: Record<string, { title: string; description?: string }> = {
+    [DASHBOARD_PATH]: { title: "Beranda", description: "Selamat datang!" },
+    "/izin/ajukan": { title: "Ajukan Dispensasi", description: "Tulis deskripsi alasan dispensasi kamu" },
+    "/izin": { title: "Riwayat Pengajuan", description: "Pantau status dan unduh surat izin Anda." },
+    [STUDENT_LETTERS_PATH]: { title: "Surat Izin Digital" },
+    [NOTIFICATIONS_PATH]: { title: "Notifikasi" },
+  };
+  const page = pages[pathname] ?? { title: "Detail Pengajuan", description: "Informasi dan status pengajuan izin Anda." };
+  return <div className="student-app min-h-svh flex-1 bg-[#f5f6f8]">
+    <DesktopNav role={profile.role} />
+    <div className="flex min-h-svh min-w-0 flex-col lg:pl-[214px]">
+      <div className="flex min-h-11 items-center justify-between gap-4 bg-[#343b41] px-4 text-white sm:px-7">
+        <Link href={DASHBOARD_PATH} aria-label="Beranda SMK Telkom Purwokerto" className="flex items-center gap-1.5 py-2">
+          <Image src="/branding/telkom-schools.png" alt="" width={22} height={28} className="h-6 w-auto brightness-0 invert" />
+          <span className="text-[10px] leading-[1.05] font-medium">SMK Telkom<br />Purwokerto</span>
+        </Link>
+        <span className="text-[11px] whitespace-nowrap" suppressHydrationWarning>{schoolTerm()}</span>
+      </div>
+      <header className="flex min-h-[70px] items-center justify-between gap-4 px-4 py-3 sm:px-7">
+        <div className="min-w-0">
+          <h1 className="text-lg leading-6 font-semibold tracking-tight">{page.title}</h1>
+          {page.description ? <p className="mt-0.5 text-xs leading-relaxed text-[#6f7380]">{page.description}</p> : null}
+        </div>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <NotificationBell userId={profile.id} role={profile.role} />
+          <AccountMenu profile={profile} />
+        </div>
+      </header>
+      <main className="w-full min-w-0 flex-1 px-4 pt-0 pb-[calc(6rem+env(safe-area-inset-bottom))] sm:px-7 lg:pb-8">{children}</main>
+      <MobileNav role={profile.role} />
+    </div>
+  </div>;
 }
 
 function AccountMenu({ profile }: { profile: Profile }) {

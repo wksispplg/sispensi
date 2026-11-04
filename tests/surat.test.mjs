@@ -195,8 +195,14 @@ test("route unduhan menjaga akses dan mengirim byte PDF sebagai lampiran", async
   assert.match(response.headers.get("Content-Disposition"), /^attachment;/);
   assert.equal(response.headers.get("Content-Length"), String(bytes.byteLength));
   assert.deepEqual(new Uint8Array(await response.arrayBuffer()), bytes);
+  const previewRequest = new Request(`${origin}/surat/${token}?preview=1`);
+  const preview = await GET(previewRequest, context);
+  assert.match(preview.headers.get("Content-Disposition"), /^inline;/);
+  assert.equal(preview.headers.get("Cache-Control"), "private, no-store");
+  assert.deepEqual(new Uint8Array(await preview.arrayBuffer()), bytes);
   allowed = false;
   assert.equal((await GET(request, context)).status, 403);
+  assert.equal((await GET(previewRequest, context)).status, 403);
   loggedIn = false;
   assert.match((await GET(request, context)).headers.get("Location"), /\/login$/);
 });

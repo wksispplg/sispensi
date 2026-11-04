@@ -312,3 +312,61 @@
     @apply bg-background text-foreground font-sans;
   }
 }
+
+/* Area siswa mengikuti desain Figma; guru/admin memakai tema umum. */
+@layer components {
+.student-app {
+  --primary: #f00000;
+  --primary-foreground: #fff;
+  --brand: #f00000;
+  color: #101114;
+}
+.student-sidebar {
+  width: 214px;
+  padding: 36px 20px 26px 18px;
+}
+.student-sidebar > a { font-size: 20px; }
+.student-sidebar nav a { min-height: 38px; font-size: 11px; }
+.student-sidebar nav svg { width: 14px; height: 14px; }
+.student-sidebar nav ul { gap: 8px; }
+.student-panel {
+  min-width: 0;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 3px 4px rgb(21 28 38 / 0.11);
+}
+.student-button {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 999px;
+  background: #f00000;
+  padding: 8px 18px;
+  font-size: 12px;
+  font-weight: 500;
+  color: white;
+  transition: background 150ms;
+}
+.student-button:hover { background: #d60000; }
+.student-button:disabled { cursor: not-allowed; opacity: 0.5; }
+.student-button:focus-visible, .student-tab:focus-visible { outline: 2px solid #f00000; outline-offset: 3px; }
+.student-tab {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #f4f4f5;
+  padding: 6px 18px;
+  font-size: 12px;
+  white-space: nowrap;
+  transition: background 150ms;
+}
+.student-tab:hover { background: #eaeaec; }
+.student-tab[aria-pressed="true"] { background: #f00000; color: white; }
+@media (min-width: 1024px) {
+  .student-tab { min-height: 28px; padding: 4px 18px; }
+}
+}
