@@ -82,6 +82,7 @@ export function rekapQueryString(f: RekapFilters): string {
 
 export type RekapRow = {
   id: string;
+  studentId: string;
   createdAt: string;
   studentName: string;
   nis: string;
@@ -247,6 +248,7 @@ export async function loadRekap(
     const status = r.status as RequestStatus;
     return {
       id: r.id,
+      studentId: r.student_id,
       createdAt: r.created_at,
       studentName: s?.full_name ?? "—",
       nis: s?.nis ?? "",

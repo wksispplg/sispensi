@@ -15,7 +15,7 @@ test("rekap dan ekspor memakai rentang jam tanpa statistik pemantauan",async()=>
   const load=createTsLoader({"@/lib/supabase/admin":{createAdminClient:()=>admin}});
   const {loadRekap}=load("src/features/rekap/data");
   const data=await loadRekap({from:"2026-11-01",to:"2026-11-30",kelas:"",jenis:"",q:""});
-  assert.equal(data.total,1);assert.equal(data.rows[0].lessonPeriodEnd,5);
+  assert.equal(data.total,1);assert.equal(data.rows[0].lessonPeriodEnd,5);assert.equal(data.rows[0].studentId,"student");
   assert.equal(Object.hasOwn(data,"lateReturns"),false);
   assert.equal(Object.hasOwn(data.rows[0],"lateMinutes"),false);
   const {buildRekapXlsx,buildRekapPdf}=load("src/features/rekap/export");

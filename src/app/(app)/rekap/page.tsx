@@ -22,6 +22,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { BkAnalysisButton } from "@/features/bk-ai/analysis-button";
 
 /** Jumlah baris yang ditampilkan di tabel halaman (ekspor memuat semuanya). */
 const TABLE_ROWS = 100;
@@ -39,7 +40,7 @@ export default async function RekapPage({
 }: {
   searchParams: Promise<Record<string, string | undefined>>;
 }) {
-  await requireRole(ROLES.GURU_BK, ROLES.ADMIN);
+  const profile = await requireRole(ROLES.GURU_BK, ROLES.ADMIN);
   const filters = parseRekapFilters(await searchParams);
   const { from, to, kelas, jenis, q } = filters;
 
@@ -241,6 +242,7 @@ export default async function RekapPage({
                     <th className="py-2 pr-3 font-medium">Jenis</th>
                     <th className="py-2 pr-3 font-medium">Tanggal</th>
                     <th className="py-2 font-medium">Status</th>
+                    {profile.role === ROLES.GURU_BK ? <th className="py-2 pl-4 font-medium">Analisis BK</th> : null}
                   </tr>
                 </thead>
                 <tbody>
@@ -265,6 +267,7 @@ export default async function RekapPage({
                           </span>
                         ) : null}
                       </td>
+                      {profile.role === ROLES.GURU_BK ? <td className="py-2 pl-4"><BkAnalysisButton studentId={r.studentId} studentName={r.studentName} /></td> : null}
                     </tr>
                   ))}
                 </tbody>
