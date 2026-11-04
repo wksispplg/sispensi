@@ -20,17 +20,16 @@ import {
   type LookupResult,
 } from "./actions";
 import {
-  DISPEN_DURATION_OPTIONS,
   EVIDENCE_MAX_BYTES,
   EVIDENCE_MIME_TYPES,
   IZIN_TYPE_LABELS,
-  isTimerIzin,
+  LESSON_PERIODS,
   type IzinType,
 } from "@/lib/constants";
 import { useFormAction } from "@/hooks/use-form-action";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { lessonPeriodLabel, lessonRangeLabel } from "@/features/izin/lesson-periods";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { SelectNative } from "@/components/ui/select-native";
@@ -52,7 +51,11 @@ function SchedulePreview({
 }) {
   return (
     <div className="min-w-0 text-sm leading-relaxed wrap-anywhere" aria-live="polite">
-      {!preview || pending ? (
+      {preview?.status === "choose_period" && !pending ? (
+        <p className="text-muted-foreground">Pilih jam pelajaran untuk melihat guru penanggung jawab.</p>
+      ) : preview?.status === "error" && !pending ? (
+        <p className="text-destructive">{preview.message}</p>
+      ) : !preview || pending ? (
         <p className="text-muted-foreground">Memuat jadwal…</p>
       ) : preview?.status === "found" ? (
         <div className="flex items-start gap-2">
@@ -69,9 +72,11 @@ function SchedulePreview({
             </p>
           </div>
         </div>
+      ) : preview?.status === "fallback" && !preview.approver ? (
+        <p className="text-destructive">Guru untuk jam pelajaran ini dan wali kelas belum tersedia. Hubungi Admin sebelum mengirim pengajuan.</p>
       ) : preview?.status === "fallback" ? (
         <p className="text-muted-foreground">
-          Tidak ada jadwal pelajaran pada {preview.day} jam itu — izin diproses{" "}
+          Tidak ada jadwal guru pada jam pelajaran yang dipilih ({preview.day}) — izin diproses{" "}
           <span className="text-foreground font-medium">Wali Kelas</span>
           {preview.approver ? ` (${preview.approver})` : ""}.
         </p>
@@ -92,8 +97,8 @@ export default function AjukanIzinPage() {
   );
 
   const [izinType, setIzinType] = useState("");
-  const [waktu, setWaktu] = useState("");
-  const [duration, setDuration] = useState("30");
+  const [startPeriod, setStartPeriod] = useState("");
+  const [endPeriod, setEndPeriod] = useState("");
   const [reason, setReason] = useState("");
   const [evidence, setEvidence] = useState<{
     name: string;
@@ -103,12 +108,12 @@ export default function AjukanIzinPage() {
   const [preview, setPreview] = useState<LookupResult | null>(null);
   const [previewPending, startPreview] = useTransition();
 
-  // Ambil jadwal untuk waktu terpilih (debounce). Kosong = sekarang.
+  // Pratinjau memakai nomor jam sekolah, bukan urutan baris jadwal guru.
   useEffect(() => {
     let active = true;
     const handle = setTimeout(() => {
       startPreview(async () => {
-        const result = await lookupSchedule(waktu);
+        const result = await lookupSchedule(startPeriod).catch((): LookupResult => ({ status: "error", message: "Jadwal belum dapat dimuat. Periksa koneksi lalu pilih kembali jam pelajaran." }));
         if (active) setPreview(result);
       });
     }, 350);
@@ -116,17 +121,9 @@ export default function AjukanIzinPage() {
       active = false;
       clearTimeout(handle);
     };
-  }, [waktu]);
+  }, [startPeriod]);
 
-  const useTimer = isTimerIzin(izinType as IzinType);
-  const selectedTime = waktu ? new Date(waktu) : null;
-  const timeLabel =
-    selectedTime && !Number.isNaN(selectedTime.getTime())
-      ? new Intl.DateTimeFormat("id-ID", {
-          dateStyle: "medium",
-          timeStyle: "short",
-        }).format(selectedTime)
-      : "Mulai sekarang";
+  const timeLabel = lessonRangeLabel(Number(startPeriod), Number(endPeriod)) ?? "Belum dipilih";
 
   return (
     <div className="flex w-full min-w-0 flex-col gap-5 pt-2 lg:pt-4">
@@ -155,7 +152,7 @@ export default function AjukanIzinPage() {
             </div>
           </CardHeader>
           <CardContent className="flex flex-col gap-6 p-5 sm:p-6">
-            <div className="grid min-w-0 gap-5 xl:grid-cols-2">
+            <div className="flex min-w-0 flex-col gap-5">
               <div className="flex min-w-0 flex-col gap-2">
                 <Label htmlFor="izin_type">
                   Jenis izin <span className="text-destructive">*</span>
@@ -178,46 +175,34 @@ export default function AjukanIzinPage() {
                   ))}
                 </SelectNative>
               </div>
+            </div>
+            <div className="grid min-w-0 gap-5 sm:grid-cols-2">
               <div className="flex min-w-0 flex-col gap-2">
-                <Label htmlFor="requested_at">Waktu izin</Label>
-                <Input
-                  id="requested_at"
-                  name="requested_at"
-                  type="datetime-local"
+                <Label htmlFor="lesson_period_start">Dari jam pelajaran <span className="text-destructive">*</span></Label>
+                <SelectNative
+                  id="lesson_period_start"
+                  name="lesson_period_start"
+                  required
                   className="h-12 rounded-xl border-zinc-200 bg-white shadow-none md:h-12"
-                  value={waktu}
-                  onChange={(e) => setWaktu(e.target.value)}
-                />
+                  value={startPeriod}
+                  onChange={(e) => { const value = e.target.value; setStartPeriod(value); if (endPeriod && Number(endPeriod) < Number(value)) setEndPeriod(""); setPreview(null); }}
+                >
+                  <option value="" disabled>Pilih jam pelajaran…</option>
+                  {LESSON_PERIODS.map((period) => <option key={period.number} value={period.number}>{lessonPeriodLabel(period.number)}</option>)}
+                </SelectNative>
                 <p className="text-muted-foreground text-xs">
-                  Kosongkan bila izin berlaku mulai sekarang.
+                  Berlaku untuk hari ini (WIB). Waktu istirahat tidak dihitung sebagai jam pelajaran.
                 </p>
               </div>
+            <div className="flex min-w-0 flex-col gap-2">
+              <Label htmlFor="lesson_period_end">Sampai jam pelajaran <span className="text-destructive">*</span></Label>
+              <SelectNative id="lesson_period_end" name="lesson_period_end" required value={endPeriod} onChange={(e) => setEndPeriod(e.target.value)} disabled={!startPeriod} className="h-12 rounded-xl border-zinc-200 bg-white shadow-none md:h-12">
+                <option value="" disabled>Pilih jam pelajaran akhir…</option>
+                {LESSON_PERIODS.filter((period) => period.number >= Number(startPeriod)).map((period) => <option key={period.number} value={period.number}>{lessonPeriodLabel(period.number)}</option>)}
+              </SelectNative>
+              <p className="text-muted-foreground text-xs">Guru penanggung jawab mengikuti jadwal pada jam awal.</p>
             </div>
-
-            {useTimer ? (
-              <div className="rounded-xl border border-amber-200/70 bg-amber-50/60 p-4">
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="duration_minutes">
-                    Perkiraan durasi keluar <span className="text-destructive">*</span>
-                  </Label>
-                  <SelectNative
-                    id="duration_minutes"
-                    name="duration_minutes"
-                    required
-                    value={duration}
-                    onChange={(e) => setDuration(e.target.value)}
-                    className="h-12 rounded-xl border-amber-200 bg-white shadow-none md:h-12"
-                  >
-                    {DISPEN_DURATION_OPTIONS.map((m) => (
-                      <option key={m} value={m}>{m} menit</option>
-                    ))}
-                  </SelectNative>
-                  <p className="text-muted-foreground text-xs leading-relaxed">
-                    Hitung mundur dimulai saat Anda menekan “Mulai Dispen” setelah izin disetujui.
-                  </p>
-                </div>
-              </div>
-            ) : null}
+            </div>
 
             <div className="flex flex-col gap-2">
               <div className="flex items-center justify-between gap-3">
@@ -324,7 +309,7 @@ export default function AjukanIzinPage() {
               <Button type="button" variant="outline" asChild className="h-11 rounded-xl bg-white px-5 md:h-11">
                 <Link href="/izin">Batal</Link>
               </Button>
-              <Button type="submit" disabled={pending} className="h-11 rounded-xl px-5 md:h-11">
+              <Button type="submit" disabled={pending || previewPending || !startPeriod || !endPeriod || !preview || preview.status === "error" || preview.status === "no_class" || (preview.status === "fallback" && !preview.approver)} className="h-11 rounded-xl px-5 md:h-11">
                 <Send className="size-4" aria-hidden />
                 {pending ? "Mengirim…" : "Kirim Pengajuan"}
               </Button>
@@ -343,8 +328,7 @@ export default function AjukanIzinPage() {
             <CardContent className="px-5">
               <dl className="flex flex-col gap-4 text-sm">
                 <SummaryItem label="Jenis izin" value={IZIN_TYPE_LABELS[izinType as IzinType] || "Belum dipilih"} />
-                <SummaryItem label="Waktu izin" value={timeLabel} />
-                {useTimer ? <SummaryItem label="Durasi keluar" value={`${duration} menit`} /> : null}
+                <SummaryItem label="Jam pelajaran (hari ini)" value={timeLabel} />
                 <SummaryItem label="Bukti pendukung" value={fileError ? "Periksa kembali lampiran" : evidence?.name || "Belum dilampirkan"} />
               </dl>
             </CardContent>

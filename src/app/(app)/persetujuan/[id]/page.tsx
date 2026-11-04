@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { lessonRangeLabel } from "@/features/izin/lesson-periods";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Paperclip } from "lucide-react";
 
@@ -27,6 +28,7 @@ import { DecisionForm } from "./decision-form";
 const dateFmt = new Intl.DateTimeFormat("id-ID", {
   dateStyle: "long",
   timeStyle: "short",
+  timeZone: "Asia/Jakarta",
 });
 
 export default async function PersetujuanDetailPage({
@@ -117,8 +119,8 @@ export default async function PersetujuanDetailPage({
           <Field label="Waktu izin">
             {dateFmt.format(new Date(req.requested_at))}
           </Field>
-          {req.duration_minutes ? (
-            <Field label="Durasi diminta">{req.duration_minutes} menit</Field>
+          {req.lesson_period_start && req.lesson_period_end ? (
+            <Field label="Jam pelajaran">{lessonRangeLabel(req.lesson_period_start, req.lesson_period_end)}</Field>
           ) : null}
           <Field label="Diajukan">
             {dateFmt.format(new Date(req.created_at))}

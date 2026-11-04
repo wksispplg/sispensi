@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { lessonRangeLabel } from "@/features/izin/lesson-periods";
 import { redirect } from "next/navigation";
 import { ChevronRight, ClipboardList, Paperclip } from "lucide-react";
 
@@ -16,6 +17,7 @@ import { Card, CardContent } from "@/components/ui/card";
 const dateFmt = new Intl.DateTimeFormat("id-ID", {
   dateStyle: "medium",
   timeStyle: "short",
+  timeZone: "Asia/Jakarta",
 });
 
 export default async function PersetujuanPage({
@@ -33,18 +35,19 @@ export default async function PersetujuanPage({
   let query = supabase
     .from("permission_requests")
     .select(
-      "id, izin_type, reason, current_layer, requested_at, created_at, current_deadline, evidence_url, student_id, class_id",
+      "id, izin_type, reason, current_layer, requested_at, created_at, current_deadline, evidence_url, student_id, class_id, lesson_period_start, lesson_period_end",
     )
     .eq("status", "pending");
 
   if (profile.role === ROLES.GURU_BK) {
-    query = query.eq("current_layer", 3);
+    // Guru BK dapat ditugaskan mengajar/perwalian di Lapis 1/2 juga.
+    query = query.or(`current_approver_id.eq.${profile.id},current_layer.eq.3`);
   } else if (profile.role !== ROLES.ADMIN) {
     // guru_mapel / wali_kelas → hanya yang ditugaskan ke saya
     query = query.eq("current_approver_id", profile.id);
   }
 
-  const { data: requests } = await query.order("current_deadline", {
+  const { data: requests, error: requestsError } = await query.order("current_deadline", {
     ascending: true,
     nullsFirst: false,
   });
@@ -83,7 +86,9 @@ export default async function PersetujuanPage({
         </p>
       ) : null}
 
-      {list.length === 0 ? (
+      {requestsError ? (
+        <p role="alert" className="rounded-md bg-destructive/10 px-4 py-3 text-sm text-destructive">Daftar pengajuan belum dapat dimuat. Periksa koneksi dan muat ulang halaman.</p>
+      ) : list.length === 0 ? (
         <Card className="border-dashed">
           <CardContent className="flex flex-col items-center gap-3 py-10 text-center">
             <div className="bg-muted flex size-12 items-center justify-center rounded-full">
@@ -123,6 +128,7 @@ export default async function PersetujuanPage({
                       <p className="text-muted-foreground truncate text-sm">
                         {r.reason}
                       </p>
+                      {r.lesson_period_start && r.lesson_period_end ? <p className="text-muted-foreground mt-1 text-xs">{lessonRangeLabel(r.lesson_period_start, r.lesson_period_end)}</p> : null}
                       {r.current_deadline ? (
                         <p className="text-muted-foreground mt-1 text-xs">
                           Batas respons: {dateFmt.format(new Date(r.current_deadline))}

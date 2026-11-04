@@ -22,12 +22,12 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { CancelButton } from "./cancel-button";
-import { DispenControls } from "@/features/dispen/dispen-controls";
-import { dispenPhase } from "@/features/dispen/phase";
+import { lessonRangeLabel } from "@/features/izin/lesson-periods";
 
 const dateFmt = new Intl.DateTimeFormat("id-ID", {
   dateStyle: "long",
   timeStyle: "short",
+  timeZone: "Asia/Jakarta",
 });
 
 export default async function DetailIzinPage({
@@ -76,7 +76,7 @@ export default async function DetailIzinPage({
 
   const isOwner = req.student_id === profile.id;
   const canCancel = isOwner && req.status === REQUEST_STATUS.PENDING;
-  const phase = dispenPhase(req);
+  const rangeLabel = lessonRangeLabel(req.lesson_period_start, req.lesson_period_end);
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-4">
@@ -109,8 +109,8 @@ export default async function DetailIzinPage({
           <Field label="Waktu izin">
             {dateFmt.format(new Date(req.requested_at))}
           </Field>
-          {req.duration_minutes ? (
-            <Field label="Durasi dispen">{req.duration_minutes} menit</Field>
+          {rangeLabel ? (
+            <Field label="Jam pelajaran">{rangeLabel}</Field>
           ) : null}
           <Field label="Diajukan">
             {dateFmt.format(new Date(req.created_at))}
@@ -155,9 +155,9 @@ export default async function DetailIzinPage({
             </Field>
           ) : null}
 
-          {letter?.qr_token || canCancel ? (
+          {(letter?.qr_token && req.status === REQUEST_STATUS.APPROVED) || canCancel ? (
             <div className="flex flex-wrap items-center gap-3 border-t pt-4">
-              {letter?.qr_token ? (
+              {letter?.qr_token && req.status === REQUEST_STATUS.APPROVED ? (
                 <Button asChild size="sm">
                   <a
                     href={`/surat/${letter.qr_token}`}
@@ -174,16 +174,6 @@ export default async function DetailIzinPage({
           ) : null}
         </CardContent>
       </Card>
-
-      {isOwner && phase !== "none" ? (
-        <DispenControls
-          id={req.id}
-          phase={phase}
-          durationMinutes={req.duration_minutes}
-          dispenDeadline={req.dispen_deadline}
-          returnedAt={req.returned_at}
-        />
-      ) : null}
 
       <Card>
         <CardHeader>

@@ -3,12 +3,16 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { ensureLetterPdf } from "@/features/surat/letter";
 import { LOGIN_PATH } from "@/lib/constants";
+import { LETTER_TOKEN_PATTERN, letterVerificationUrl } from "@/features/surat/qr";
+
+export const runtime = "nodejs";
 
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ token: string }> },
 ) {
   const { token } = await params;
+  if (!LETTER_TOKEN_PATTERN.test(token)) return new NextResponse("Surat tidak ditemukan.", { status: 404 });
 
   const supabase = await createClient();
   const {
@@ -30,20 +34,25 @@ export async function GET(
     });
   }
 
-  const origin =
-    process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin;
-  const verifyUrl = `${origin}/verify/${token}`;
-
-  const result = await ensureLetterPdf(token, verifyUrl);
+  let result;
+  try {
+    const verifyUrl = letterVerificationUrl(token, request.url, process.env.NEXT_PUBLIC_APP_URL);
+    result = await ensureLetterPdf(token, verifyUrl);
+  } catch {
+    console.error("[surat] Pembuatan PDF belum berhasil.");
+    return new NextResponse("Surat belum dapat dibuat. Silakan coba lagi atau hubungi administrator SIPENSI.", { status: 503, headers: { "Cache-Control": "no-store" } });
+  }
   if (!result) {
-    return new NextResponse("Surat tidak ditemukan.", { status: 404 });
+    return new NextResponse("Surat tidak ditemukan atau pengajuan belum disetujui.", { status: 404 });
   }
 
-  return new NextResponse(result.bytes as BodyInit, {
+  return new NextResponse(Buffer.from(result.bytes), {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `inline; filename="${result.filename}"`,
-      "Cache-Control": "no-store",
+      "Content-Disposition": `attachment; filename="${result.filename}"`,
+      "Content-Length": String(result.bytes.byteLength),
+      "X-Content-Type-Options": "nosniff",
+      "Cache-Control": "private, no-store",
     },
   });
 }

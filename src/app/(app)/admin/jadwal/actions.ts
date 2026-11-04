@@ -6,6 +6,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getProfile } from "@/lib/auth";
 import { ADMIN_SCHEDULES_PATH, ROLES } from "@/lib/constants";
+import { getLessonPeriod } from "@/features/izin/lesson-periods";
 
 export type FormState = { error?: string; ok?: boolean };
 
@@ -14,15 +15,13 @@ async function isAdmin(): Promise<boolean> {
   return profile?.role === ROLES.ADMIN;
 }
 
-const timeRegex = /^([01]\d|2[0-3]):[0-5]\d$/;
-
 const scheduleSchema = z.object({
   class_id: z.uuid("Kelas wajib dipilih"),
   subject_id: z.uuid("Mata pelajaran wajib dipilih"),
   teacher_id: z.uuid("Guru wajib dipilih"),
   day_of_week: z.coerce.number().int().min(1).max(7),
-  start_time: z.string().regex(timeRegex, "Jam mulai tidak valid"),
-  end_time: z.string().regex(timeRegex, "Jam selesai tidak valid"),
+  start_period: z.coerce.number().int().min(1, "Pilih jam pelajaran awal").max(11),
+  end_period: z.coerce.number().int().min(1, "Pilih jam pelajaran akhir").max(11),
 });
 
 export async function createSchedule(
@@ -36,18 +35,22 @@ export async function createSchedule(
     subject_id: formData.get("subject_id"),
     teacher_id: formData.get("teacher_id"),
     day_of_week: formData.get("day_of_week"),
-    start_time: formData.get("start_time"),
-    end_time: formData.get("end_time"),
+    start_period: formData.get("start_period"),
+    end_period: formData.get("end_period"),
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Input tidak valid." };
   }
-  if (parsed.data.end_time <= parsed.data.start_time) {
-    return { error: "Jam selesai harus setelah jam mulai." };
+  if (parsed.data.end_period < parsed.data.start_period) {
+    return { error: "Jam pelajaran akhir tidak boleh sebelum jam pelajaran awal." };
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.from("schedules").insert(parsed.data);
+  const { start_period, end_period, ...schedule } = parsed.data;
+  const { error } = await supabase.from("schedules").insert({ ...schedule,
+    start_time: getLessonPeriod(start_period)!.start,
+    end_time: getLessonPeriod(end_period)!.end,
+  });
   if (error) {
     // 23P01 = melanggar constraint schedules_no_overlap (migrasi 0012).
     return {

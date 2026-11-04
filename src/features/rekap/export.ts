@@ -12,6 +12,7 @@ import {
 } from "pdf-lib";
 
 import type { RekapData, RekapRow } from "@/features/rekap/data";
+import { lessonRangeLabel } from "@/features/izin/lesson-periods";
 
 export const XLSX_MIME =
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
@@ -31,13 +32,7 @@ export function rekapFileBase(d: RekapData): string {
 /** Keterangan tambahan per baris (tolak otomatis, keterlambatan, dsb.). */
 function keterangan(r: RekapRow): string {
   if (r.autoRejected) return "Ditolak otomatis (tidak ditanggapi > 1 hari)";
-  if (r.lateMinutes && r.lateMinutes > 0) {
-    return r.returnedAt
-      ? `Terlambat kembali ${r.lateMinutes} menit`
-      : `Belum kembali, lewat ${r.lateMinutes} menit`;
-  }
   if (r.status === "pending") return `Menunggu Lapis ${r.layer}`;
-  if (r.returnedAt) return "Kembali tepat waktu";
   return "";
 }
 
@@ -49,7 +44,6 @@ function summaryRows(d: RekapData): [string, number][] {
     ["   di antaranya ditolak otomatis", d.autoRejected],
     ["Menunggu", d.pending],
     ["Eskalasi sampai Lapis 3", d.escalatedL3],
-    ["Terlambat kembali dari dispen", d.lateReturns],
   ];
 }
 
@@ -119,10 +113,9 @@ export async function buildRekapXlsx(
     { header: "Alasan", key: "alasan", width: 42 },
     { header: "Status", key: "status", width: 20 },
     { header: "Keterangan", key: "ket", width: 38 },
-    { header: "Durasi Dispen (menit)", key: "durasi", width: 12 },
-    { header: "Mulai Dispen (WIB)", key: "mulai", width: 22 },
-    { header: "Kembali (WIB)", key: "kembali", width: 22 },
-    { header: "Terlambat (menit)", key: "telat", width: 12 },
+    { header: "Jam Pelajaran", key: "jam", width: 44 },
+    { header: "Mulai Izin (WIB)", key: "mulai", width: 22 },
+    { header: "Sampai (WIB)", key: "sampai", width: 22 },
   ];
   styleHeaderRow(data, 1);
   d.rows.forEach((r, i) => {
@@ -136,14 +129,13 @@ export async function buildRekapXlsx(
       alasan: r.reason,
       status: r.statusLabel,
       ket: keterangan(r),
-      durasi: r.durationMinutes,
-      mulai: fmtDT(r.dispenStartedAt),
-      kembali: fmtDT(r.returnedAt),
-      telat: r.lateMinutes,
+      jam: lessonRangeLabel(r.lessonPeriodStart, r.lessonPeriodEnd) ?? "",
+      mulai: fmtDT(r.requestedAt),
+      sampai: fmtDT(r.requestedUntil),
     });
   });
   data.getColumn("alasan").alignment = { wrapText: true, vertical: "top" };
-  data.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: 13 } };
+  data.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: 12 } };
 
   const buf = await wb.xlsx.writeBuffer();
   return new Uint8Array(buf as ArrayBuffer);
@@ -231,7 +223,6 @@ export async function buildRekapPdf(
     ["Ditolak", d.rejected],
     ["Ditolak otomatis", d.autoRejected],
     ["Menunggu", d.pending],
-    ["Terlambat kembali", d.lateReturns],
   ];
   const gap = 8;
   const boxW = (contentW - gap * (kpis.length - 1)) / kpis.length;

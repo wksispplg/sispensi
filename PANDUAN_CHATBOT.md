@@ -44,7 +44,7 @@ Pengguna diingatkan agar tidak mengirim data pribadi.
 ## Isi panduan
 
 Panduan meliputi pengertian SIPENSI, akun/login, lupa password, cara mengajukan
-izin, bukti pendukung, jenis izin, durasi dispen, persetujuan, pembatalan,
+izin, bukti pendukung, jenis izin, rentang jam pelajaran, persetujuan, pembatalan,
 riwayat, surat PDF/QR, peran pengguna, notifikasi, dan kontak sekolah.
 
 - Ubah isi jawaban dan tautan di `src/features/chatbot/knowledge.ts` ketika fitur berubah.

@@ -1,6 +1,4 @@
 import {
-  DISPEN_MAX_MINUTES,
-  DISPEN_MIN_MINUTES,
   EVIDENCE_MAX_BYTES,
   IZIN_TYPE_LABELS,
   LOGIN_PATH,
@@ -52,14 +50,14 @@ export const KNOWLEDGE = [
   },
   {
     id: "durasi",
-    title: "Durasi, timer, mulai dispen, dan kembali ke sekolah",
-    answer: `Izin Keluar Sementara dan Dispensasi Kegiatan memerlukan perkiraan durasi (${DISPEN_MIN_MINUTES}–${DISPEN_MAX_MINUTES} menit). Setelah disetujui, tekan Mulai Dispen pada detail pengajuan saat akan keluar. Hitung mundur dimulai setelah tombol itu ditekan. Saat sudah kembali, tekan Kembali ke Sekolah. Jika durasi terlewati sebelum melapor kembali, sistem menandai keterlambatan.`,
+    title: "Rentang jam pelajaran awal dan akhir untuk izin",
+    answer: "Waktu izin dipilih dari jam pelajaran awal sampai jam pelajaran akhir (1–11) untuk hari ini dalam WIB. Waktu istirahat tidak dihitung sebagai jam pelajaran. Guru penanggung jawab mengikuti jadwal pada jam awal. Fitur pemantauan keluar/kembali dan timer dispen sudah tidak digunakan.",
     match: /\b(durasi|timer|countdown|hitung mundur|berapa menit|mulai dispen|kembali ke sekolah|terlambat|batas waktu dispen)\b/,
   },
   {
     id: "pengajuan",
     title: "Cara mengisi formulir dan mengajukan izin",
-    answer: "Login sebagai siswa, buka menu Ajukan Izin, lalu pilih jenis izin, isi waktu izin dan alasan, serta lampirkan bukti pendukung. Waktu izin boleh dikosongkan jika mulai sekarang. Untuk Keluar Sementara atau Dispensasi Kegiatan, pilih juga perkiraan durasi. Periksa isian, lalu tekan Kirim Pengajuan. Perkembangannya dapat dilihat di Riwayat Pengajuan.",
+    answer: "Login sebagai siswa, buka menu Ajukan Izin, lalu pilih jenis izin serta jam pelajaran awal dan akhir (1–11) untuk hari ini (WIB). Isi alasan dan lampirkan bukti pendukung. Waktu istirahat tidak dihitung sebagai jam pelajaran. Periksa isian, lalu tekan Kirim Pengajuan. Perkembangannya dapat dilihat di Riwayat Pengajuan.",
     match: /\b(ajukan|mengajukan|pengajuan|mengisi|formulir|form|minta izin|bikin izin|buat izin|cara.*dispen)\b/,
     links: [{ label: "Login untuk mengajukan izin", href: LOGIN_PATH }],
   },

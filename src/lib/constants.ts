@@ -133,42 +133,20 @@ export const IZIN_TYPE_LABELS: Record<IzinType, string> = {
   lainnya: "Lainnya",
 };
 
-// ========================================================================
-// Timer / Countdown Dispen (fitur pemantauan izin keluar)
-// Hanya jenis "kembali ke sekolah" yang memakai timer durasi.
-// ========================================================================
-export const TIMER_IZIN_TYPES: readonly IzinType[] = [
-  IZIN_TYPES.KELUAR_SEMENTARA,
-  IZIN_TYPES.DISPENSASI,
-];
-
-export function isTimerIzin(type: IzinType): boolean {
-  return TIMER_IZIN_TYPES.includes(type);
-}
-
-/** Pilihan durasi dispen (menit) untuk siswa saat mengajukan. */
-export const DISPEN_DURATION_OPTIONS = [10, 15, 20, 30, 45, 60, 90, 120] as const;
-export const DISPEN_MIN_MINUTES = 5;
-export const DISPEN_MAX_MINUTES = 240;
-
-/** Fase dispen — DIHITUNG dari timestamp pengajuan, bukan nilai enum status. */
-export const DISPEN_PHASE = {
-  NONE: "none",
-  READY: "ready", // sudah disetujui, belum menekan "Mulai Dispen"
-  ACTIVE: "active", // sedang di luar, hitung mundur berjalan
-  OVERDUE: "overdue", // lewat batas, belum lapor kembali
-  RETURNED: "returned", // sudah lapor kembali ke sekolah
-} as const;
-
-export type DispenPhase = (typeof DISPEN_PHASE)[keyof typeof DISPEN_PHASE];
-
-export const DISPEN_PHASE_LABELS: Record<DispenPhase, string> = {
-  none: "",
-  ready: "Siap Dispen",
-  active: "Sedang Dispen",
-  overdue: "Terlambat Kembali",
-  returned: "Sudah Kembali",
-};
+/** Jam pelajaran sekolah (WIB). Slot tanpa nomor adalah istirahat/kegiatan awal. */
+export const LESSON_PERIODS = [
+  { number: 1, start: "07:10", end: "07:50" },
+  { number: 2, start: "07:50", end: "08:30" },
+  { number: 3, start: "09:00", end: "09:40" },
+  { number: 4, start: "09:40", end: "10:20" },
+  { number: 5, start: "10:20", end: "11:00" },
+  { number: 6, start: "11:00", end: "11:40" },
+  { number: 7, start: "11:40", end: "12:20" },
+  { number: 8, start: "13:20", end: "14:00" },
+  { number: 9, start: "14:00", end: "14:40" },
+  { number: 10, start: "14:40", end: "15:20" },
+  { number: 11, start: "15:20", end: "16:00" },
+] as const;
 
 // ========================================================================
 // Rute aplikasi
@@ -177,7 +155,7 @@ export const LOGIN_PATH = "/login";
 export const DASHBOARD_PATH = "/dashboard";
 export const APPROVALS_PATH = "/persetujuan";
 export const APPROVAL_HISTORY_PATH = "/riwayat-keputusan";
-export const PEMANTAUAN_PATH = "/pemantauan";
+export const SCAN_PATH = "/scan";
 export const REKAP_PATH = "/rekap";
 export const ADMIN_HOME_PATH = "/admin";
 export const ADMIN_CLASSES_PATH = "/admin/kelas";

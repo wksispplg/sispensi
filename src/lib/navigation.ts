@@ -10,7 +10,7 @@ import {
   FilePlus2,
   History,
   House,
-  Timer,
+  ScanLine,
   Users,
 } from "lucide-react";
 
@@ -20,8 +20,8 @@ import {
   APPROVAL_HISTORY_PATH,
   APPROVALS_PATH,
   DASHBOARD_PATH,
-  PEMANTAUAN_PATH,
   REKAP_PATH,
+  SCAN_PATH,
   ROLES,
   type Role,
 } from "@/lib/constants";
@@ -44,6 +44,14 @@ const HOME: NavItem = {
   icon: House,
 };
 
+const SCAN: NavItem = {
+  href: SCAN_PATH,
+  label: "Scan QR",
+  title: "Scan QR Surat",
+  description: "Periksa surat izin siswa lewat kamera atau gambar QR.",
+  icon: ScanLine,
+};
+
 const NAV: Record<Role, NavItem[]> = {
   [ROLES.SISWA]: [
     HOME,
@@ -64,19 +72,13 @@ const NAV: Record<Role, NavItem[]> = {
   ],
   [ROLES.GURU_MAPEL]: [
     HOME,
+    SCAN,
     {
       href: APPROVALS_PATH,
       label: "Persetujuan",
       title: "Perlu Persetujuan",
       description: "Tinjau & putuskan pengajuan izin siswa.",
       icon: ClipboardList,
-    },
-    {
-      href: PEMANTAUAN_PATH,
-      label: "Pemantauan",
-      title: "Pemantauan Dispen",
-      description: "Pantau siswa yang Anda izinkan keluar & kelas perwalian Anda.",
-      icon: Timer,
     },
     {
       href: APPROVAL_HISTORY_PATH,
@@ -88,19 +90,13 @@ const NAV: Record<Role, NavItem[]> = {
   ],
   [ROLES.WALI_KELAS]: [
     HOME,
+    SCAN,
     {
       href: APPROVALS_PATH,
       label: "Persetujuan",
       title: "Perlu Persetujuan",
       description: "Tinjau & putuskan pengajuan izin siswa.",
       icon: ClipboardList,
-    },
-    {
-      href: PEMANTAUAN_PATH,
-      label: "Pemantauan",
-      title: "Pemantauan Dispen",
-      description: "Pantau siswa kelas Anda yang sedang dispen keluar.",
-      icon: Timer,
     },
     {
       href: APPROVAL_HISTORY_PATH,
@@ -112,19 +108,13 @@ const NAV: Record<Role, NavItem[]> = {
   ],
   [ROLES.GURU_BK]: [
     HOME,
+    SCAN,
     {
       href: APPROVALS_PATH,
       label: "Persetujuan",
       title: "Perlu Persetujuan",
-      description: "Tinjau pengajuan eskalasi tahap akhir.",
+      description: "Tinjau izin yang ditugaskan kepada Anda dan eskalasi tahap akhir.",
       icon: ClipboardList,
-    },
-    {
-      href: PEMANTAUAN_PATH,
-      label: "Pemantauan",
-      title: "Pemantauan Dispen",
-      description: "Pantau seluruh siswa yang sedang dispen keluar.",
-      icon: Timer,
     },
     {
       href: APPROVAL_HISTORY_PATH,
@@ -143,6 +133,7 @@ const NAV: Record<Role, NavItem[]> = {
   ],
   [ROLES.ADMIN]: [
     HOME,
+    SCAN,
     {
       href: ADMIN_HOME_PATH,
       label: "Data Master",
@@ -156,13 +147,6 @@ const NAV: Record<Role, NavItem[]> = {
       title: "Jadwal Pelajaran",
       description: "Kelola mata pelajaran & jadwal per kelas.",
       icon: CalendarClock,
-    },
-    {
-      href: PEMANTAUAN_PATH,
-      label: "Pemantauan",
-      title: "Pemantauan Dispen",
-      description: "Pantau seluruh siswa yang sedang dispen keluar.",
-      icon: Timer,
     },
     {
       href: REKAP_PATH,

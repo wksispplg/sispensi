@@ -214,6 +214,9 @@ export type Database = {
           matched_schedule_id: string | null
           reason: string
           requested_at: string
+          requested_until: string | null
+          lesson_period_start: number | null
+          lesson_period_end: number | null
           status: Database["public"]["Enums"]["request_status"]
           student_id: string
           updated_at: string
@@ -236,6 +239,9 @@ export type Database = {
           matched_schedule_id?: string | null
           reason: string
           requested_at?: string
+          requested_until?: string | null
+          lesson_period_start?: number | null
+          lesson_period_end?: number | null
           status?: Database["public"]["Enums"]["request_status"]
           student_id: string
           updated_at?: string
@@ -258,6 +264,9 @@ export type Database = {
           matched_schedule_id?: string | null
           reason?: string
           requested_at?: string
+          requested_until?: string | null
+          lesson_period_start?: number | null
+          lesson_period_end?: number | null
           status?: Database["public"]["Enums"]["request_status"]
           student_id?: string
           updated_at?: string
@@ -441,8 +450,6 @@ export type Database = {
         Returns: { approver_id: string; schedule_id: string }[]
       }
       escalate_overdue_requests: { Args: never; Returns: number }
-      start_dispen: { Args: { p_request: string }; Returns: string }
-      return_dispen: { Args: { p_request: string }; Returns: string }
       current_user_role: {
         Args: never
         Returns: Database["public"]["Enums"]["user_role"]

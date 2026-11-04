@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { lessonRangeLabel } from "@/features/izin/lesson-periods";
 import { ChevronRight, FilePlus2, Paperclip } from "lucide-react";
 
 import { createClient } from "@/lib/supabase/server";
@@ -16,6 +17,7 @@ import { Card, CardContent } from "@/components/ui/card";
 const dateFmt = new Intl.DateTimeFormat("id-ID", {
   dateStyle: "medium",
   timeStyle: "short",
+  timeZone: "Asia/Jakarta",
 });
 
 export default async function RiwayatIzinPage({
@@ -31,7 +33,7 @@ export default async function RiwayatIzinPage({
   const { data: requests } = await supabase
     .from("permission_requests")
     .select(
-      "id, izin_type, reason, status, current_layer, requested_at, created_at, evidence_url, duration_minutes, dispen_started_at, dispen_deadline, returned_at",
+      "id, izin_type, reason, status, current_layer, requested_at, created_at, evidence_url, requested_until, lesson_period_start, lesson_period_end",
     )
     .eq("student_id", profile.id)
     .order("created_at", { ascending: false });
@@ -103,8 +105,9 @@ export default async function RiwayatIzinPage({
                       ) : null}
                     </div>
                     <p className="text-muted-foreground truncate text-sm">
-                      {r.reason}
+                        {r.reason}
                     </p>
+                      {r.lesson_period_start && r.lesson_period_end ? <p className="text-muted-foreground mt-1 text-xs">{lessonRangeLabel(r.lesson_period_start, r.lesson_period_end)}</p> : null}
                     <p className="text-muted-foreground mt-1 text-xs">
                       {dateFmt.format(new Date(r.created_at))}
                       {r.status === REQUEST_STATUS.PENDING

@@ -27,7 +27,7 @@ export default async function RiwayatKeputusanPage() {
   const { data: requests } = await supabase
     .from("permission_requests")
     .select(
-      "id, izin_type, reason, status, decided_at, student_id, class_id, duration_minutes, dispen_started_at, dispen_deadline, returned_at",
+      "id, izin_type, reason, status, decided_at, student_id, class_id, requested_until, lesson_period_start, lesson_period_end",
     )
     .eq("decided_by", profile.id)
     .order("decided_at", { ascending: false });

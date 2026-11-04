@@ -92,6 +92,7 @@ export function MobileNav({ role }: { role: Role }) {
             <li key={item.href} className="min-w-0 flex-1">
               <Link
                 href={item.href}
+                aria-label={item.title}
                 aria-current={isActive ? "page" : undefined}
                 className={cn(
                   "focus-visible:ring-ring/50 flex h-16 flex-col items-center justify-center gap-1 text-[10px] font-medium transition-colors outline-none min-[360px]:text-[11px] focus-visible:ring-[3px] sm:text-xs",
@@ -101,7 +102,7 @@ export function MobileNav({ role }: { role: Role }) {
                 )}
               >
                 <Icon className="size-5" aria-hidden />
-                {item.label}
+                <span className="max-w-full truncate px-0.5">{item.label}</span>
               </Link>
             </li>
           );

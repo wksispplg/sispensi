@@ -94,11 +94,10 @@ export type RekapRow = {
   layer: number;
   /** Ditolak oleh sistem karena tidak ditanggapi > 1 hari. */
   autoRejected: boolean;
-  durationMinutes: number | null;
-  dispenStartedAt: string | null;
-  returnedAt: string | null;
-  /** Menit terlambat kembali (0 = tepat waktu, null = bukan dispen berjalan). */
-  lateMinutes: number | null;
+  requestedAt: string;
+  requestedUntil: string | null;
+  lessonPeriodStart: number | null;
+  lessonPeriodEnd: number | null;
 };
 
 export type CountItem = { key: string; label: string; value: number };
@@ -116,7 +115,6 @@ export type RekapData = {
   autoRejected: number;
   pending: number;
   escalatedL3: number;
-  lateReturns: number;
   monthly: boolean;
   trend: { label: string; value: number }[];
   byStatus: CountItem[];
@@ -126,26 +124,11 @@ export type RekapData = {
   rows: RekapRow[];
 };
 
-function lateMinutes(
-  startedAt: string | null,
-  deadline: string | null,
-  returnedAt: string | null,
-  nowMs: number,
-): number | null {
-  if (!startedAt || !deadline) return null;
-  const end = returnedAt ? new Date(returnedAt).getTime() : nowMs;
-  const lateMs = end - new Date(deadline).getTime();
-  // Dibulatkan ke ATAS agar konsisten dengan layar pemantauan, yang menandai
-  // "Terlambat" begitu batas waktu lewat (terlambat 30 detik = 1 menit).
-  return lateMs > 0 ? Math.ceil(lateMs / 60000) : 0;
-}
-
 export async function loadRekap(
   f: RekapFilters,
-  opts: { rowLimit?: number; nowMs?: number } = {},
+  opts: { rowLimit?: number } = {},
 ): Promise<RekapData> {
   const rowLimit = opts.rowLimit ?? REKAP_MAX_ROWS;
-  const nowMs = opts.nowMs ?? Date.now();
   const admin = createAdminClient();
 
   const { data: classes } = await admin
@@ -168,7 +151,7 @@ export async function loadRekap(
   let query = admin
     .from("permission_requests")
     .select(
-      "id, student_id, class_id, izin_type, status, current_layer, created_at, reason, decided_by, duration_minutes, dispen_started_at, dispen_deadline, returned_at",
+      "id, student_id, class_id, izin_type, status, current_layer, created_at, reason, decided_by, requested_at, requested_until, lesson_period_start, lesson_period_end",
     )
     .gte("created_at", `${f.from}T00:00:00+07:00`)
     .lte("created_at", `${f.to}T23:59:59+07:00`);
@@ -197,7 +180,6 @@ export async function loadRekap(
   const trendCount = new Map<string, number>();
   let escalatedL3 = 0;
   let autoRejected = 0;
-  let lateReturns = 0;
 
   for (const r of requests) {
     statusCount.set(r.status, (statusCount.get(r.status) ?? 0) + 1);
@@ -206,13 +188,6 @@ export async function loadRekap(
     classCount.set(ck, (classCount.get(ck) ?? 0) + 1);
     if (r.current_layer >= 3) escalatedL3++;
     if (r.status === REQUEST_STATUS.REJECTED && !r.decided_by) autoRejected++;
-    const late = lateMinutes(
-      r.dispen_started_at,
-      r.dispen_deadline,
-      r.returned_at,
-      nowMs,
-    );
-    if (late && late > 0) lateReturns++;
     const key = wibDate(new Date(r.created_at));
     const bucket = monthly ? key.slice(0, 7) : key;
     trendCount.set(bucket, (trendCount.get(bucket) ?? 0) + 1);
@@ -283,15 +258,10 @@ export async function loadRekap(
       reason: r.reason,
       layer: r.current_layer,
       autoRejected: status === REQUEST_STATUS.REJECTED && !r.decided_by,
-      durationMinutes: r.duration_minutes,
-      dispenStartedAt: r.dispen_started_at,
-      returnedAt: r.returned_at,
-      lateMinutes: lateMinutes(
-        r.dispen_started_at,
-        r.dispen_deadline,
-        r.returned_at,
-        nowMs,
-      ),
+      requestedAt: r.requested_at,
+      requestedUntil: r.requested_until,
+      lessonPeriodStart: r.lesson_period_start,
+      lessonPeriodEnd: r.lesson_period_end,
     };
   });
 
@@ -312,7 +282,6 @@ export async function loadRekap(
     autoRejected,
     pending: statusCount.get(REQUEST_STATUS.PENDING) ?? 0,
     escalatedL3,
-    lateReturns,
     monthly,
     trend,
     byStatus,

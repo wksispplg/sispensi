@@ -144,7 +144,7 @@ export default async function RekapPage({
       </Card>
 
       {/* KPI */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
         <Stat label="Total Pengajuan" value={data.total} />
         <Stat
           label="Disetujui"
@@ -166,7 +166,6 @@ export default async function RekapPage({
           className="text-amber-600 dark:text-amber-400"
         />
         <Stat label="Eskalasi Lapis 3" value={data.escalatedL3} />
-        <Stat label="Terlambat Kembali" value={data.lateReturns} />
       </div>
 
       {/* Tren */}

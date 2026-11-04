@@ -2,9 +2,9 @@
 
 import { createSchedule, type FormState } from "./actions";
 import { useFormAction } from "@/hooks/use-form-action";
-import { DAY_LABELS } from "@/lib/constants";
+import { DAY_LABELS, LESSON_PERIODS } from "@/lib/constants";
+import { lessonPeriodLabel } from "@/features/izin/lesson-periods";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SelectNative } from "@/components/ui/select-native";
 
@@ -119,13 +119,19 @@ export function ScheduleForm({
       </div>
 
       <div className="flex flex-col gap-2">
-        <Label htmlFor="start_time">Jam mulai</Label>
-        <Input id="start_time" name="start_time" type="time" required />
+        <Label htmlFor="start_period">Jam pelajaran awal</Label>
+        <SelectNative id="start_period" name="start_period" required defaultValue="">
+          <option value="" disabled>Pilih jam awal…</option>
+          {LESSON_PERIODS.map((period) => <option key={period.number} value={period.number}>{lessonPeriodLabel(period.number)}</option>)}
+        </SelectNative>
       </div>
 
       <div className="flex flex-col gap-2">
-        <Label htmlFor="end_time">Jam selesai</Label>
-        <Input id="end_time" name="end_time" type="time" required />
+        <Label htmlFor="end_period">Jam pelajaran akhir</Label>
+        <SelectNative id="end_period" name="end_period" required defaultValue="">
+          <option value="" disabled>Pilih jam akhir…</option>
+          {LESSON_PERIODS.map((period) => <option key={period.number} value={period.number}>{lessonPeriodLabel(period.number)}</option>)}
+        </SelectNative>
       </div>
 
       {state.error ? (
