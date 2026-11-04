@@ -1,7 +1,7 @@
 import { CircleCheck, GraduationCap, QrCode } from "lucide-react";
 
 const rows: [string, string][] = [
-  ["Nama", "Siswa Contoh"],
+  ["Nama", "Aditya Pratama"],
   ["Kelas", "XI RPL 1"],
   ["Jenis izin", "Dispensasi"],
   ["Waktu", "Senin, 12 Okt 2026 · 08.15"],

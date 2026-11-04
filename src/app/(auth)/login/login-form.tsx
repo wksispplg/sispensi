@@ -26,23 +26,26 @@ export function LoginForm({ next }: { next?: string }) {
           Masuk <UserRound className="size-7" aria-hidden />
         </h1>
         <p className="text-muted-foreground mt-2 text-sm">
-          Masukkan email dan password yang sesuai
+          Siswa dapat masuk dengan NIS atau email dan password
         </p>
       </div>
 
       <form action={formAction} className="mt-10 flex flex-col gap-5">
         <input type="hidden" name="next" value={next ?? ""} />
         <div className="flex flex-col gap-2">
-          <Label htmlFor="email" className="px-1">
-            Email
+          <Label htmlFor="identifier" className="px-1">
+            NIS atau Email
           </Label>
           <Input
-            id="email"
-            name="email"
-            type="email"
-            autoComplete="email"
-            defaultValue={state.email}
-            placeholder="nama@smktelkom-pwt.sch.id"
+            id="identifier"
+            name="identifier"
+            type="text"
+            autoComplete="username"
+            autoCapitalize="none"
+            spellCheck={false}
+            maxLength={254}
+            defaultValue={state.identifier}
+            placeholder="NIS atau email akun sekolah"
             required
             className={fieldClass}
           />

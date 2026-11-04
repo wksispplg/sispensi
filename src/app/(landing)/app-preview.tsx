@@ -39,7 +39,7 @@ export function AppPreview() {
             <span className="bg-brand absolute -top-0.5 -right-0.5 size-1.5 rounded-full" />
           </span>
           <div className="hidden text-right leading-tight sm:block">
-            <p className="text-[10px] font-medium">Siswa Contoh</p>
+            <p className="text-[10px] font-medium">Aditya Pratama</p>
             <p className="text-[9px] text-zinc-500">Siswa</p>
           </div>
           <span className="rounded-md border px-2 py-0.5 text-[10px]">

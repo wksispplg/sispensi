@@ -25,14 +25,14 @@ export const KNOWLEDGE = [
   {
     id: "password",
     title: "Lupa password, akun belum tersedia, pendaftaran, dan masalah login",
-    answer: "Akun SIPENSI dikelola oleh sekolah, jadi kamu tidak perlu mendaftar sendiri. Jika belum memiliki akun, lupa password, atau tetap gagal masuk setelah memeriksa email dan password, hubungi Administrator SIPENSI (bagian Tata Usaha). Chatbot tidak dapat membuat akun atau mereset password.",
+    answer: "Akun SIPENSI dikelola oleh sekolah, jadi kamu tidak perlu mendaftar sendiri. Jika belum memiliki akun, lupa password, atau tetap gagal masuk setelah memeriksa NIS/email dan password, hubungi Administrator SIPENSI (bagian Tata Usaha). Chatbot tidak dapat membuat akun atau mereset password.",
     match: /\b(lupa|reset|ganti|ubah)\b.{0,30}\b(password|sandi)\b|\b(daftar|registrasi|register|belum.*akun|buat akun|bikin akun|gagal.*(login|masuk)|tidak bisa.*(login|masuk)|ga bisa.*(login|masuk)|gak bisa.*(login|masuk))\b/,
     links: [{ label: "Halaman login", href: LOGIN_PATH }],
   },
   {
     id: "login",
     title: "Cara masuk atau login menggunakan akun sekolah",
-    answer: "Klik Masuk di beranda, lalu isi email dan password akun SIPENSI yang diberikan sekolah. Kamu juga bisa memilih Masuk Sebagai Siswa atau Masuk Sebagai Guru di beranda. Setelah berhasil login, menu akan menyesuaikan peran akunmu.",
+    answer: "Klik Masuk di beranda. Siswa dapat memakai NIS atau email beserta password akun SIPENSI yang diberikan sekolah. Guru dan admin masuk dengan email dan password. Kamu juga bisa memilih Masuk Sebagai Siswa atau Masuk Sebagai Guru di beranda. Setelah berhasil login, menu akan menyesuaikan peran akunmu.",
     match: /\b(login|log in|masuk|sign in)\b/,
     links: [{ label: "Masuk ke SIPENSI", href: LOGIN_PATH }],
   },

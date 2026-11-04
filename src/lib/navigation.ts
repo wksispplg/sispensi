@@ -157,7 +157,6 @@ const NAV: Record<Role, NavItem[]> = {
   ],
   [ROLES.ADMIN]: [
     HOME,
-    APPROVALS,
     {
       href: ADMIN_HOME_PATH,
       label: "Data",
@@ -178,13 +177,6 @@ const NAV: Record<Role, NavItem[]> = {
       title: "Dashboard Rekap",
       description: "Rekapitulasi perizinan seluruh sekolah.",
       icon: BarChart3,
-    },
-    {
-      href: APPROVAL_HISTORY_PATH,
-      label: "Riwayat",
-      title: "Riwayat Keputusan",
-      description: "Keputusan yang pernah Anda proses.",
-      icon: History,
     },
     SCAN,
     NOTIFICATIONS,

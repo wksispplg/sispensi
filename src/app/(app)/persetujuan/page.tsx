@@ -8,7 +8,7 @@ import { StaffEmpty, StaffError } from "@/features/approvals/staff-widgets";
 export default async function PersetujuanPage({ searchParams }: { searchParams: Promise<{ done?: string }> }) {
   const profile = await getProfile();
   if (!profile) return null;
-  if (profile.role === ROLES.SISWA) redirect(DASHBOARD_PATH);
+  if (profile.role === ROLES.SISWA || profile.role === ROLES.ADMIN) redirect(DASHBOARD_PATH);
   const [{ done }, data] = await Promise.all([searchParams, getPendingApprovals(profile)]);
   return <div className="space-y-6 pt-2 lg:pt-4">
     {done === "1" ? <p role="status" className="rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800">Keputusan tersimpan.</p> : null}

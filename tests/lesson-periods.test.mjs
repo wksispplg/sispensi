@@ -145,12 +145,17 @@ test("Guru BK menerima tugas Lapis 1/2 selain antrian Lapis 3; guru lain tetap d
         calls.push(["table",table]);return q;
       }})},
     });
+    if(role==="admin") {
+      await assert.rejects(loader("src/app/(app)/persetujuan/page").default({searchParams:Promise.resolve({})}),/forbidden/);
+      assert.equal(calls.length,0);
+      continue;
+    }
     await loader("src/app/(app)/persetujuan/page").default({searchParams:Promise.resolve({})});
     assert.ok(calls.some(c=>c[0]==="eq"&&c[1]==="status"&&c[2]==="pending"));
     if(role==="guru_bk"){
       assert.ok(calls.some(c=>c[0]==="or"&&c[1]==="current_approver_id.eq.teacher,current_layer.eq.3"));
       assert.ok(!calls.some(c=>c[0]==="eq"&&c[1]==="current_layer"));
-    } else if(role!=="admin") assert.ok(calls.some(c=>c[1]==="current_approver_id"&&c[2]==="teacher"));
+    } else assert.ok(calls.some(c=>c[1]==="current_approver_id"&&c[2]==="teacher"));
   }
 });
 

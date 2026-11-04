@@ -13,7 +13,7 @@ export function StudentDashboard({ profile, requests: list, statistics, failed }
   return <div className="flex flex-col gap-7 lg:gap-9">
     <section className="flex min-h-[108px] min-w-0 flex-col justify-center gap-5 rounded-[19px] border border-[#1c2832] bg-[#343b41] px-6 py-5 text-white sm:flex-row sm:items-center sm:justify-between">
       <div className="min-w-0">
-        <p className="text-xs leading-5 font-light text-[#bdc7ce]">Halo{profile.nis ? `, ${profile.nis}` : ""}</p>
+        <p className="text-xs leading-5 font-light text-[#bdc7ce]">Selamat datang{profile.nis ? `, ${profile.nis}` : ""}</p>
         <h2 className="mt-0.5 text-xl leading-8 font-medium tracking-tight wrap-anywhere sm:text-2xl">{profile.full_name?.trim() || "Siswa"}</h2>
       </div>
       <Link href="/izin/ajukan" className="student-button w-fit shrink-0">Ajukan Dispen <Plus className="size-4" strokeWidth={1.5} aria-hidden /></Link>

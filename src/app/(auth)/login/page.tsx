@@ -22,7 +22,7 @@ const PANELS: Record<"siswa" | "pengajar", Panel> = {
     steps: [
       {
         title: "Masuk",
-        desc: "Masukkan email dan password untuk melanjutkan",
+        desc: "Masukkan NIS atau email dan password untuk melanjutkan",
       },
       {
         title: "Ajukan Dispen",

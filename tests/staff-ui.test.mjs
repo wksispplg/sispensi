@@ -24,8 +24,8 @@ function environment(role="guru_mapel", rpcError=null) {
   return {loader,calls,profile,rpcs,invalidated};
 }
 
-test("daftar dan angka persetujuan mengikuti penugasan guru, BK Lapis 1/2/3, dan admin",async()=>{
-  for(const role of ["guru_mapel","wali_kelas","guru_bk","admin"]){
+test("daftar dan angka persetujuan mengikuti penugasan guru dan BK Lapis 1/2/3",async()=>{
+  for(const role of ["guru_mapel","wali_kelas","guru_bk"]){
     const {loader,calls,profile}=environment(role);
     const data=await loader("src/features/approvals/data").getStaffDashboard(profile);
     const pending=calls.filter(call=>call.table==="permission_requests"&&call.filters.some(([key,value])=>key==="status"&&value==="pending")&&!call.filters.some(([key])=>key==="current_layer"));
@@ -41,9 +41,17 @@ test("daftar dan angka persetujuan mengikuti penugasan guru, BK Lapis 1/2/3, dan
     assert.equal(data.pending[0].hasEvidence,true);
     assert.equal(Object.hasOwn(data.pending[0],"evidence_url"),false);
     assert.equal(Object.hasOwn(data.pending[0],"student_id"),false);
-    if(role==="admin")assert.deepEqual(data.school,{students:7,teachers:7,classes:7});
     if(role==="guru_bk")assert.equal(data.layer3Count,7);
   }
+});
+
+test("beranda admin hanya menghitung data sekolah tanpa membaca antrean persetujuan",async()=>{
+  const {loader,calls,profile}=environment("admin");
+  const data=await loader("src/features/approvals/data").getStaffDashboard(profile);
+  assert.deepEqual(data.school,{students:7,teachers:7,classes:7,schedules:7});
+  assert.equal(calls.some(call=>call.table==="permission_requests"),false);
+  assert.deepEqual(data.pending,[]);assert.deepEqual(data.recentDecisions,[]);
+  assert.equal(data.failed,false);
 });
 
 test("riwayat guru, BK dan admin hanya memuat keputusan akun sendiri",async()=>{
@@ -85,6 +93,8 @@ test("menu guru, BK dan admin tersedia tanpa fitur pemantauan yang sudah dihapus
   for(const role of ["guru_mapel","wali_kelas","guru_bk","admin"]){
     const items=navItemsForRole(role);assert.ok(items.some(item=>item.href==="/notifikasi"));assert.ok(items.some(item=>item.href==="/scan"));assert.ok(items.every(item=>item.href!=="/pemantauan"));
   }
+  assert.ok(navItemsForRole("admin").every(item=>!["/persetujuan","/riwayat-keputusan"].includes(item.href)));
+  for(const role of ["guru_mapel","wali_kelas","guru_bk"])assert.ok(navItemsForRole(role).some(item=>item.href==="/persetujuan"));
 });
 
 test("beranda guru tidak memuat contoh hitungan atau istilah pemantauan; menu admin tetap memakai data sekolah",()=>{
@@ -94,6 +104,19 @@ test("beranda guru tidak memuat contoh hitungan atau istilah pemantauan; menu ad
   const data={pending:[],recentDecisions:[],statistics:{total:23,approved:20,rejected:3,approvedToday:2},pendingCount:6,school:null,layer3Count:0,failed:false,now:Date.parse("2026-11-04T03:00:00Z")};
   const html=renderToStaticMarkup(React.createElement(Dashboard,{profile:{role:"guru_mapel",full_name:"Guru Contoh"},data}));
   assert.match(html,/Guru Contoh/);assert.match(html,/>23<\/p>/);assert.match(html,/Tinjau Pengajuan/);assert.doesNotMatch(html,/Sedang Dispen|Belum kembali|Pemantauan/);
-  const admin=renderToStaticMarkup(React.createElement(Dashboard,{profile:{role:"admin",full_name:"Admin Contoh"},data:{...data,school:{students:100,teachers:10,classes:4}}}));
+  const admin=renderToStaticMarkup(React.createElement(Dashboard,{profile:{role:"admin",full_name:"Admin Contoh"},data:{...data,school:{students:100,teachers:10,classes:4,schedules:8}}}));
   assert.match(admin,/Total Siswa/);assert.match(admin,/Kelola Data Sekolah/);assert.match(admin,/href="\/admin\/siswa"/);
+  assert.match(admin,/Total Jadwal/);assert.doesNotMatch(admin,/Persetujuan|Tinjau Pengajuan|Setujui|Tolak|href="\/persetujuan/);
+});
+
+test("halaman notifikasi admin tidak memuat antrean keputusan cepat",async()=>{
+  const env=environment("admin");let pendingCalls=0;
+  const loader=createTsLoader({
+    "@/lib/auth":{requireProfile:async()=>env.profile},
+    "@/lib/supabase/server":{createClient:async()=>({from:()=>({select(){return this;},eq(){return this;},async order(){return {data:[],error:null};}})})},
+    "@/features/approvals/data":{getPendingApprovals:async()=>{pendingCalls++;return {items:[row]};}},
+    "./notification-list":{NotificationList:()=>null},
+  });
+  const element=await loader("src/app/(app)/notifikasi/page").default();
+  assert.equal(pendingCalls,0);assert.deepEqual(element.props.pendingRequests,[]);
 });

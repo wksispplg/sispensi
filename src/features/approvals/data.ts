@@ -74,22 +74,32 @@ export async function getDecisionHistory(profile: Profile, limit?: number) {
 
 export async function getStaffDashboard(profile: Profile) {
   const client = await createClient();
-  let pendingCountQuery = client.from("permission_requests").select("id", { count: "exact", head: true }).eq("status", REQUEST_STATUS.PENDING);
-  if (profile.role === ROLES.GURU_BK) pendingCountQuery = pendingCountQuery.or(`current_approver_id.eq.${profile.id},current_layer.eq.3`);
-  else if (profile.role !== ROLES.ADMIN) pendingCountQuery = pendingCountQuery.eq("current_approver_id", profile.id);
-  const [pending, history, pendingCount, extra] = await Promise.all([
-    getPendingApprovals(profile, 3), getDecisionHistory(profile, 2), pendingCountQuery,
-    profile.role === ROLES.ADMIN ? Promise.all([
+  if (profile.role === ROLES.ADMIN) {
+    const counts = await Promise.all([
       client.from("profiles").select("id", { count: "exact", head: true }).eq("role", ROLES.SISWA),
       client.from("profiles").select("id", { count: "exact", head: true }).in("role", [...APPROVER_ROLES]),
       client.from("classes").select("id", { count: "exact", head: true }),
-    ]) : profile.role === ROLES.GURU_BK ? Promise.all([
+      client.from("schedules").select("id", { count: "exact", head: true }),
+    ]);
+    return {
+      pending: [] as ApprovalItem[], recentDecisions: [] as DecisionItem[],
+      statistics: { total: 0, approved: 0, rejected: 0, approvedToday: 0 }, pendingCount: 0,
+      school: { students: counts[0].count ?? 0, teachers: counts[1].count ?? 0, classes: counts[2].count ?? 0, schedules: counts[3].count ?? 0 },
+      layer3Count: 0, failed: counts.some((result) => !!result.error), now: Date.now(),
+    };
+  }
+  let pendingCountQuery = client.from("permission_requests").select("id", { count: "exact", head: true }).eq("status", REQUEST_STATUS.PENDING);
+  if (profile.role === ROLES.GURU_BK) pendingCountQuery = pendingCountQuery.or(`current_approver_id.eq.${profile.id},current_layer.eq.3`);
+  else pendingCountQuery = pendingCountQuery.eq("current_approver_id", profile.id);
+  const [pending, history, pendingCount, extra] = await Promise.all([
+    getPendingApprovals(profile, 3), getDecisionHistory(profile, 2), pendingCountQuery,
+    profile.role === ROLES.GURU_BK ? Promise.all([
       client.from("permission_requests").select("id", { count: "exact", head: true }).eq("status", REQUEST_STATUS.PENDING).eq("current_layer", 3),
     ]) : Promise.resolve([]),
   ]);
   return {
     pending: pending.items, recentDecisions: history.items, statistics: history.statistics, pendingCount: pendingCount.count ?? 0,
-    school: profile.role === ROLES.ADMIN ? { students: extra[0]?.count ?? 0, teachers: extra[1]?.count ?? 0, classes: extra[2]?.count ?? 0 } : null,
+    school: null,
     layer3Count: profile.role === ROLES.GURU_BK ? extra[0]?.count ?? 0 : 0,
     failed: pending.failed || history.failed || !!pendingCount.error || extra.some((result) => !!result.error),
     now: Date.now(),

@@ -23,7 +23,7 @@ export function NotificationList({ initialItems, now, role = ROLES.SISWA, pendin
   const router = useRouter();
   const staff = role !== ROLES.SISWA;
   const items = initialItems.map((item) => readIds.has(item.id) ? { ...item, is_read: true } : item);
-  const pendingMap = new Map(pendingRequests.map((request) => [request.id, request]));
+  const pendingMap = new Map((role === ROLES.ADMIN ? [] : pendingRequests).map((request) => [request.id, request]));
   const unread = items.filter((item) => !item.is_read).length;
   const visible = items.filter((item) => filter === "all" || (filter === "unread" ? !item.is_read : filter === "letters" ? ["letter", "approved"].includes(notificationKind(item)) : notificationKind(item) !== "letter"));
 

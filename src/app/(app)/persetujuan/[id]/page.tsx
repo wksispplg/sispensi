@@ -83,15 +83,15 @@ export default async function PersetujuanDetailPage({
   }
 
   const canDecide =
+    profile.role !== ROLES.ADMIN &&
     req.status === REQUEST_STATUS.PENDING &&
     (req.current_approver_id === profile.id ||
-      (req.current_layer === 3 && profile.role === ROLES.GURU_BK) ||
-      profile.role === ROLES.ADMIN);
+      (req.current_layer === 3 && profile.role === ROLES.GURU_BK));
 
   return (
     <div className="grid min-w-0 items-start gap-5 lg:grid-cols-[minmax(0,1.5fr)_minmax(280px,1fr)]">
       <Link
-        href="/persetujuan"
+        href={profile.role === ROLES.ADMIN ? "/rekap" : "/persetujuan"}
         className="text-muted-foreground hover:text-foreground inline-flex w-fit items-center gap-1 text-sm lg:col-span-2"
       >
         <ArrowLeft className="size-4" />
