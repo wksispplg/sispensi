@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 import { getProfile } from "@/lib/auth";
 import { ADMIN_STUDENTS_PATH, ROLES } from "@/lib/constants";
 import { parseSheet, pickField } from "@/features/data-master/spreadsheet";
@@ -29,6 +30,97 @@ const studentSchema = z.object({
   class_id: z.string().trim().optional(),
   nis: z.string().trim().max(30).optional(),
 });
+
+const studentProfileSchema = studentSchema.pick({ full_name: true, nis: true }).extend({
+  class_id: z.union([z.literal(""), z.uuid()], { error: "Kelas tidak valid." }),
+});
+
+const studentLoginSchema = z.object({
+  email: z.string().trim().pipe(z.email("Email tidak valid")),
+  password: studentSchema.shape.password
+    .refine((value) => value.trim().length > 0, "Password tidak boleh hanya berisi spasi.")
+    .refine((value) => new TextEncoder().encode(value).length <= 72, "Password maksimal 72 byte.")
+    .or(z.literal("")),
+});
+
+export async function updateStudentProfile(
+  id: string,
+  updatedAt: string,
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  if (!(await isAdmin())) return { error: "Hanya admin." };
+  if (!z.uuid().safeParse(id).success) return { error: "Akun siswa tidak ditemukan." };
+  const parsed = studentProfileSchema.safeParse({
+    full_name: formData.get("full_name"),
+    nis: formData.get("nis"),
+    class_id: formData.get("class_id"),
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Input tidak valid." };
+
+  const { full_name, nis, class_id } = parsed.data;
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("profiles")
+    .update({ full_name, nis: nis || null, class_id: class_id || null })
+    .eq("id", id)
+    .eq("role", ROLES.SISWA)
+    .eq("updated_at", updatedAt)
+    .select("id")
+    .maybeSingle();
+  if (error?.code === "23505") return { error: "NIS sudah dipakai akun lain." };
+  if (error?.code === "23503") return { error: "Kelas tidak tersedia. Pilih kelas lain." };
+  if (error) return { error: "Data siswa gagal disimpan. Silakan coba lagi." };
+  if (!data) return { error: "Data siswa sudah berubah atau akun tidak tersedia. Muat ulang halaman." };
+
+  revalidatePath(ADMIN_STUDENTS_PATH);
+  revalidatePath(`${ADMIN_STUDENTS_PATH}/${id}/edit`);
+  return { ok: true };
+}
+
+export async function updateStudentLogin(
+  id: string,
+  originalEmail: string,
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  if (!(await isAdmin())) return { error: "Hanya admin." };
+  if (!z.uuid().safeParse(id).success) return { error: "Akun siswa tidak ditemukan." };
+  const parsed = studentLoginSchema.safeParse({ email: formData.get("email"), password: formData.get("password") ?? "" });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Input tidak valid." };
+
+  const supabase = await createClient();
+  const { data: student, error: studentError } = await supabase.from("profiles")
+    .select("id").eq("id", id).eq("role", ROLES.SISWA).maybeSingle();
+  if (studentError) return { error: "Akun siswa belum dapat diperiksa. Silakan coba lagi." };
+  if (!student) return { error: "Akun siswa tidak ditemukan." };
+
+  const { email, password } = parsed.data;
+  const emailChanged = email !== originalEmail;
+  if (!emailChanged && !password) return { ok: true };
+  const admin = createAdminClient();
+  if (emailChanged) {
+    const current = await admin.auth.admin.getUserById(student.id);
+    if (current.error || !current.data.user) return { error: "Email siswa belum dapat diperiksa. Silakan coba lagi." };
+    const currentEmail = current.data.user.email ?? "";
+    if (currentEmail !== originalEmail && currentEmail !== email) {
+      return { error: "Email siswa sudah berubah. Muat ulang halaman sebelum menyimpan." };
+    }
+  }
+  const { data, error } = await admin.auth.admin.updateUserById(student.id, {
+    ...(emailChanged ? { email, email_confirm: true } : {}),
+    ...(password ? { password } : {}),
+  });
+  if (error?.code === "email_exists" || error?.code === "user_already_exists" || (error && /email.*already/i.test(error.message))) {
+    return { error: "Email sudah terdaftar." };
+  }
+  if (error?.code === "weak_password") return { error: "Password baru tidak memenuhi ketentuan keamanan. Gunakan password lain." };
+  if (error?.code === "same_password") return { error: "Gunakan password yang berbeda dari password saat ini." };
+  if (error || !data.user) return { error: "Akun login gagal diperbarui. Silakan coba lagi." };
+
+  revalidatePath(ADMIN_STUDENTS_PATH);
+  revalidatePath(`${ADMIN_STUDENTS_PATH}/${id}/edit`);
+  return { ok: true };
+}
 
 export async function createStudent(
   _prev: FormState,

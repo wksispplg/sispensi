@@ -6,7 +6,7 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { Bell, ChevronDown, LogOut } from "lucide-react";
 
-import { DASHBOARD_PATH, ROLE_LABELS, ROLES, STUDENT_LETTERS_PATH, STUDENT_ENTRY_PATH, NOTIFICATIONS_PATH, TEACHER_STUDENTS_PATH } from "@/lib/constants";
+import { ADMIN_STUDENTS_PATH, DASHBOARD_PATH, ROLE_LABELS, ROLES, STUDENT_LETTERS_PATH, STUDENT_ENTRY_PATH, NOTIFICATIONS_PATH, TEACHER_STUDENTS_PATH } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import type { Profile } from "@/types";
 import { DesktopNav, MobileNav } from "./app-nav";
@@ -49,8 +49,10 @@ function PortalShell({ profile, pathname, children }: { profile: Profile; pathna
     "/rekap": { title: "Rekap Perizinan", description: "Ringkasan dan laporan perizinan siswa." },
     "/scan": { title: "Scan QR Surat", description: "Periksa surat izin digital siswa." },
   };
-  const page = (staff ? staffPages : pages)[pathname] ?? { title: "Detail Pengajuan", description: "Informasi dan status pengajuan izin." };
   const isAdmin = profile.role === ROLES.ADMIN;
+  const page = isAdmin && pathname.startsWith(`${ADMIN_STUDENTS_PATH}/`) && pathname.endsWith("/edit")
+    ? { title: "Edit Siswa" }
+    : (staff ? staffPages : pages)[pathname] ?? { title: "Detail Pengajuan", description: "Informasi dan status pengajuan izin." };
   const collapsed = isAdmin && sidebarCollapsed;
   const sidebarWidth = staff ? "clamp(214px, 20.625vw, 297px)" : "214px";
   const style = { "--app-sidebar-width": collapsed ? "72px" : sidebarWidth } as CSSProperties;
