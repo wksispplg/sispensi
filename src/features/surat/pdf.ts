@@ -4,7 +4,7 @@ import { PDFDocument, StandardFonts, rgb, type PDFFont } from "pdf-lib";
 import QRCode from "qrcode";
 import { lessonRangeLabel } from "@/features/izin/lesson-periods";
 
-import { IZIN_TYPE_LABELS, ROLE_LABELS, type IzinType, type Role } from "@/lib/constants";
+import { IZIN_TYPES, IZIN_TYPE_LABELS, ROLE_LABELS, type IzinType, type Role } from "@/lib/constants";
 
 export type LetterData = {
   letterNumber: string;
@@ -54,7 +54,9 @@ export function wrapLetterText(text: string, font: PDFFont, size: number, maxWid
 /** PDF A4 berisi data persetujuan asli, tanpa bergantung pada cetak browser. */
 export async function generateLetterPdf(data: LetterData, verifyUrl: string): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
-  doc.setTitle(`Surat Izin Dispensasi - ${data.letterNumber}`);
+  const entry = data.izinType === IZIN_TYPES.MASUK_KELAS;
+  const heading = entry ? "SURAT IZIN MASUK KELAS" : "SURAT IZIN SISWA";
+  doc.setTitle(`Surat Izin ${entry ? "Masuk Kelas" : "Dispensasi"} - ${data.letterNumber}`);
   doc.setAuthor("SMK Telkom Purwokerto");
   doc.setSubject("Persetujuan izin siswa melalui SIPENSI");
   doc.setCreator("SIPENSI");
@@ -92,8 +94,8 @@ export async function generateLetterPdf(data: LetterData, verifyUrl: string): Pr
     centered("Website: smktelkom-pwt.sch.id | Telp. (0281) 632138", 744, 9, regular, left, available);
     page.drawLine({ start: { x: margin, y: 730 }, end: { x: width - margin, y: 730 }, thickness: 1.6, color: ink });
     page.drawLine({ start: { x: margin, y: 726 }, end: { x: width - margin, y: 726 }, thickness: 0.5, color: ink });
-    centered("SURAT IZIN SISWA", 696, 14, bold);
-    const titleWidth = bold.widthOfTextAtSize("SURAT IZIN SISWA", 14);
+    centered(heading, 696, 14, bold);
+    const titleWidth = bold.widthOfTextAtSize(heading, 14);
     page.drawLine({ start: { x: (width - titleWidth) / 2, y: 692 }, end: { x: (width + titleWidth) / 2, y: 692 }, thickness: 0.6, color: ink });
     centered(`Nomor: ${data.letterNumber}`, 675, 10.5, regular);
     if (continuation) centered("(Lanjutan)", 656, 10, regular);
@@ -126,7 +128,7 @@ export async function generateLetterPdf(data: LetterData, verifyUrl: string): Pr
   }
 
   header();
-  paragraph("Diberikan izin kepada:", 14);
+  paragraph(entry ? "Diberikan izin masuk kelas kepada:" : "Diberikan izin kepada:", 14);
   row("Nama siswa", data.studentName);
   row("NIS", data.nis || "-");
   row("Kelas", data.className);

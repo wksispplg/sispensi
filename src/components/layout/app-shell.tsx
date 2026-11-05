@@ -6,7 +6,7 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { Bell, ChevronDown, LogOut } from "lucide-react";
 
-import { DASHBOARD_PATH, ROLE_LABELS, ROLES, STUDENT_LETTERS_PATH, NOTIFICATIONS_PATH } from "@/lib/constants";
+import { DASHBOARD_PATH, ROLE_LABELS, ROLES, STUDENT_LETTERS_PATH, STUDENT_ENTRY_PATH, NOTIFICATIONS_PATH } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import type { Profile } from "@/types";
 import { DesktopNav, MobileNav } from "./app-nav";
@@ -28,6 +28,7 @@ function PortalShell({ profile, pathname, children }: { profile: Profile; pathna
   const pages: Record<string, { title: string; description?: string }> = {
     [DASHBOARD_PATH]: { title: "Beranda", description: "Selamat datang!" },
     "/izin/ajukan": { title: "Ajukan Dispensasi", description: "Tulis deskripsi alasan dispensasi kamu" },
+    [STUDENT_ENTRY_PATH]: { title: "Izin Masuk Kelas", description: "Isi alasan dan pilih jam pelajaran untuk masuk kelas" },
     "/izin": { title: "Riwayat Pengajuan", description: "Pantau status dan unduh surat izin Anda." },
     [STUDENT_LETTERS_PATH]: { title: "Surat Izin Digital" },
     [NOTIFICATIONS_PATH]: { title: "Notifikasi" },

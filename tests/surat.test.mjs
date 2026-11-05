@@ -43,6 +43,18 @@ test("PDF berisi halaman A4, gambar logo/QR, dan aliran isi", async () => {
   assert.ok(page.node.Resources().toString().includes("/XObject"));
 });
 
+test("surat izin masuk menampilkan jenis dan satu jam mapel yang disetujui",async()=>{
+  const bytes=await generateLetterPdf({...letterFixture,izinType:"masuk_kelas",lessonPeriodStart:3,lessonPeriodEnd:3,requestedUntil:"2026-11-03T02:40:00Z"},verifyUrl);
+  const pdf=await PDFDocument.load(bytes);
+  assert.equal(pdf.getPageCount(),1);
+  assert.match(pdf.getTitle(),/Surat Izin Masuk Kelas/);
+  const text=pdfText(pdf);
+  assert.match(text,/SURAT IZIN MASUK KELAS/);
+  assert.match(text,/Izin Masuk Kelas/);
+  assert.match(text,/Jam ke-3 \(09\.00-09\.40 WIB\)/);
+  assert.doesNotMatch(text,/s\.d\. ke-5/);
+});
+
 test("alasan panjang, kata tanpa spasi, dan tanda baca tidak membuat PDF kosong", async () => {
   const normal = await PDFDocument.load(await generateLetterPdf({ ...letterFixture, reason: "Mengikuti kegiatan resmi sekolah dan persiapan lomba. ".repeat(22).slice(0, 1000) }, verifyUrl));
   assert.equal(normal.getPageCount(), 1);

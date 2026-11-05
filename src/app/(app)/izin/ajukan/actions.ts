@@ -63,7 +63,10 @@ export async function createPermissionRequest(
     izin_type: formData.get("izin_type"),
     reason,
     lesson_period_start: formData.get("lesson_period_start"),
-    lesson_period_end: formData.get("lesson_period_end"),
+    // Izin masuk selalu satu jam mapel, termasuk bila browser mengirim jam akhir lain.
+    lesson_period_end: formData.get("izin_type") === IZIN_TYPES.MASUK_KELAS
+      ? formData.get("lesson_period_start")
+      : formData.get("lesson_period_end"),
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Input tidak valid." };
@@ -79,7 +82,7 @@ export async function createPermissionRequest(
   // Cegah pengajuan dobel: satu pengajuan menunggu per jenis izin. Dicek di sini
   // agar bukti tidak sempat diunggah; DB juga menjaganya (migrasi 0012).
   const duplicateMsg = `Masih ada pengajuan "${IZIN_TYPE_LABELS[parsed.data.izin_type]}" yang menunggu persetujuan. Tunggu keputusannya atau batalkan dulu di menu Riwayat.`;
-  const { data: pendingSame } = await supabase
+  const { data: pendingSame, error: pendingError } = await supabase
     .from("permission_requests")
     .select("id")
     .eq("student_id", profile.id)
@@ -87,6 +90,12 @@ export async function createPermissionRequest(
     .eq("status", REQUEST_STATUS.PENDING)
     .limit(1)
     .maybeSingle();
+  if (pendingError) {
+    if (pendingError.code === "22P02" && parsed.data.izin_type === IZIN_TYPES.MASUK_KELAS) {
+      return { error: "Izin Masuk Kelas belum diaktifkan di database. Hubungi admin untuk mengaktifkannya." };
+    }
+    return { error: "Pengajuan yang masih menunggu belum dapat diperiksa. Silakan coba lagi." };
+  }
   if (pendingSame) return { error: duplicateMsg };
 
   // Upload bukti (WAJIB — antisipasi izin fiktif / siswa berbohong).

@@ -28,20 +28,24 @@ export default async function AdminGuruPage() {
   await requireRole(ROLES.ADMIN);
 
   const supabase = await createClient();
-  const { data: teachers } = await supabase
+  const { data: teachers, error: teachersError } = await supabase
     .from("profiles")
     .select("id, full_name, role")
     .in("role", [...APPROVER_ROLES])
     .order("full_name");
+  if (teachersError) throw new Error("Daftar guru belum dapat dimuat. Silakan coba lagi.");
 
   const admin = createAdminClient();
-  const { data: usersData } = await admin.auth.admin.listUsers({
-    page: 1,
-    perPage: 1000,
-  });
-  const emailMap = new Map(
-    (usersData?.users ?? []).map((u) => [u.id, u.email ?? ""] as const),
-  );
+  const emailMap = new Map<string, string>();
+  const wantedIds = new Set((teachers ?? []).map((teacher) => teacher.id));
+  for (let page = 1; emailMap.size < wantedIds.size; page++) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 1000 });
+    if (error) throw new Error("Email guru belum dapat dimuat. Silakan coba lagi.");
+    for (const user of data.users) {
+      if (wantedIds.has(user.id)) emailMap.set(user.id, user.email ?? "");
+    }
+    if (data.users.length < 1000) break;
+  }
 
   const roleOptions = ALL_ROLES.map((r) => ({ value: r, label: ROLE_LABELS[r] }));
   const list = teachers ?? [];

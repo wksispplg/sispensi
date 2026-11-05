@@ -119,6 +119,7 @@ export const IZIN_TYPES = {
   SAKIT: "sakit",
   KEPERLUAN_KELUARGA: "keperluan_keluarga",
   DISPENSASI: "dispensasi",
+  MASUK_KELAS: "masuk_kelas",
   LAINNYA: "lainnya",
 } as const;
 
@@ -130,6 +131,7 @@ export const IZIN_TYPE_LABELS: Record<IzinType, string> = {
   sakit: "Sakit",
   keperluan_keluarga: "Keperluan Keluarga",
   dispensasi: "Dispensasi Kegiatan",
+  masuk_kelas: "Izin Masuk Kelas",
   lainnya: "Lainnya",
 };
 
@@ -154,6 +156,7 @@ export const LESSON_PERIODS = [
 export const LOGIN_PATH = "/login";
 export const DASHBOARD_PATH = "/dashboard";
 export const STUDENT_LETTERS_PATH = "/surat-digital";
+export const STUDENT_ENTRY_PATH = "/izin/masuk-kelas";
 export const NOTIFICATIONS_PATH = "/notifikasi";
 export const APPROVALS_PATH = "/persetujuan";
 export const APPROVAL_HISTORY_PATH = "/riwayat-keputusan";

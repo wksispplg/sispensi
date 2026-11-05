@@ -117,5 +117,24 @@ test("migrasi dan trigger PostgreSQL mengarahkan izin sesuai waktu izin secara a
         await db.query("insert into public.permission_requests(class_id,student_id,evidence_url,requested_at,requested_until,lesson_period_start,lesson_period_end) values($1,$2,'bukti.png','2026-11-03T02:00:00Z','2026-11-03T04:00:00Z',3,5)",[classId,student]);
       } finally {await db.exec("reset role");}
     });
+    await db.exec(`create type public.izin_type as enum ('dispensasi','lainnya');
+      alter table public.permission_requests add column izin_type public.izin_type not null default 'dispensasi';`);
+    const entryMigration=fs.readFileSync(path.join(projectRoot,"supabase/migrations/0015_class_entry.sql"),"utf8");
+    await db.exec(entryMigration);
+    await t.test("izin masuk memakai satu jam, tetap mengikuti guru pada jadwal dan dapat dimigrasikan ulang",async()=>{
+      const row=(await db.query(`insert into public.permission_requests(class_id,student_id,evidence_url,izin_type,requested_at,requested_until,lesson_period_start,lesson_period_end)
+        values($1,$2,'bukti.png','masuk_kelas','2026-11-03T02:00:00Z','2026-11-03T02:40:00Z',3,3) returning id`,[classId,student])).rows[0];
+      const actual=(await db.query("select izin_type,lesson_period_start,lesson_period_end,current_approver_id from public.permission_requests where id=$1",[row.id])).rows[0];
+      assert.equal(actual.izin_type,"masuk_kelas");assert.equal(actual.lesson_period_start,3);assert.equal(actual.lesson_period_end,3);
+      assert.equal(actual.current_approver_id,teacherB);
+      await db.exec(entryMigration);
+      assert.equal((await db.query("select izin_type from public.permission_requests where id=$1",[approvedId])).rows[0].izin_type,"dispensasi");
+    });
+    await t.test("database menolak izin masuk dengan rentang atau jam kosong meski lewat API langsung",async()=>{
+      await assert.rejects(()=>db.query(`insert into public.permission_requests(class_id,student_id,evidence_url,izin_type,requested_at,requested_until,lesson_period_start,lesson_period_end)
+        values($1,$2,'bukti.png','masuk_kelas','2026-11-03T02:00:00Z','2026-11-03T04:00:00Z',3,5)`,[classId,student]),/pr_class_entry_single_period/);
+      await assert.rejects(()=>db.query(`insert into public.permission_requests(class_id,student_id,evidence_url,izin_type,requested_at)
+        values($1,$2,'bukti.png','masuk_kelas','2026-11-03T02:00:00Z')`,[classId,student]),/pr_class_entry_single_period/);
+    });
   } finally {await db.close();}
 });

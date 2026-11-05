@@ -488,6 +488,7 @@ export type Database = {
         | "sakit"
         | "keperluan_keluarga"
         | "dispensasi"
+        | "masuk_kelas"
         | "lainnya"
       request_status:
         | "pending"
@@ -636,6 +637,7 @@ export const Constants = {
         "sakit",
         "keperluan_keluarga",
         "dispensasi",
+        "masuk_kelas",
         "lainnya",
       ],
       request_status: [

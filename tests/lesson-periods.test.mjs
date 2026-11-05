@@ -25,9 +25,9 @@ test("tanggal otomatis WIB tetap benar saat hari/tahun UTC berbeda", () => {
   assert.equal(lessonRequestTime(11, new Date("2026-12-31T18:00:00Z")).requestedAt, "2027-01-01T08:20:00.000Z");
 });
 
-function actionEnvironment({ missingTeacher=false, noClass=false }={}) {
+function actionEnvironment({ missingTeacher=false, noClass=false, role="siswa", pendingError=null, duplicate=false }={}) {
   const calls = { inserted:[], uploads:0, removed:0, filters:[] };
-  const profile = { id:"student", role:"siswa", class_id:noClass?null:"class" };
+  const profile = { id:"student", role, class_id:noClass?null:"class" };
   const admin = { from(table) {
     const q = {
       select(){return q;}, eq(column,value){ calls.filters.push([table,column,value]); return q; },
@@ -36,7 +36,7 @@ function actionEnvironment({ missingTeacher=false, noClass=false }={}) {
     };return q;
   }};
   const storage={from(){return {async upload(){calls.uploads++;return {error:null};},async remove(){calls.removed++;return {error:null};}};}};
-  const client={storage,from(){const q={select(){return q;},eq(){return q;},limit(){return q;},async maybeSingle(){return {data:null,error:null};},async insert(row){calls.inserted.push(row);return {error:null};}};return q;}};
+  const client={storage,from(){const q={select(){return q;},eq(column,value){calls.filters.push(["request",column,value]);return q;},limit(){return q;},async maybeSingle(){return {data:duplicate?{id:"pending-request"}:null,error:pendingError};},async insert(row){calls.inserted.push(row);return {error:null};}};return q;}};
   const loader=createTsLoader({
     "@/lib/auth":{getProfile:async()=>profile},
     "@/lib/supabase/admin":{createAdminClient:()=>admin},
@@ -120,6 +120,61 @@ test("form siswa menampilkan 11 pilihan dan tidak memiliki tanggal bebas", () =>
   const select=html.match(/<select[^>]*name="lesson_period_start"[\s\S]*?<\/select>/)[0];
   assert.equal((select.match(/<option /g)||[]).length,12); // Placeholder + 11 jam.
   assert.match(select,/15.20–16.00 WIB/);
+});
+
+test("form izin masuk mempertahankan alasan dan bukti dengan satu pilihan dari 11 jam mapel", async () => {
+  const loader=createTsLoader({"next/link":link,"./actions":{},"@/hooks/use-form-action":{useFormAction:()=>[{}, {}, false]},"@/lib/auth":{requireRole:async role=>assert.equal(role,"siswa")}});
+  const Page=loader("src/app/(app)/izin/masuk-kelas/page").default;
+  const html=renderToStaticMarkup(await Page());
+  assert.match(html,/name="izin_type" value="masuk_kelas"/);
+  assert.match(html.match(/<input(?=[^>]*name="reason")[^>]*>/)[0],/required/);
+  assert.match(html,/name="reason_detail"/);
+  assert.match(html.match(/<input(?=[^>]*name="evidence")[^>]*>/)[0],/required/);
+  assert.match(html,/Pilih jam mapel masuk/);
+  assert.doesNotMatch(html,/lesson_period_end|datetime-local|Pilih jam mapel selesai/);
+  const select=html.match(/<select[^>]*name="lesson_period_start"[\s\S]*?<\/select>/)[0];
+  assert.equal((select.match(/<option /g)||[]).length,12);
+  assert.equal((html.match(/<select/g)||[]).length,1);
+});
+
+test("izin masuk menyimpan satu jam mapel dan mengabaikan jam akhir titipan browser", async()=>{
+  for(const end of [null,"11"]) {
+    const {actions,calls}=actionEnvironment();
+    const data=form("3");data.set("izin_type","masuk_kelas");
+    if(end===null)data.delete("lesson_period_end");else data.set("lesson_period_end",end);
+    await assert.rejects(()=>actions.createPermissionRequest({},data),/REDIRECT \/izin\?ok=1/);
+    assert.equal(calls.inserted[0].izin_type,"masuk_kelas");
+    assert.equal(calls.inserted[0].lesson_period_start,3);
+    assert.equal(calls.inserted[0].lesson_period_end,3);
+    assert.equal(calls.inserted[0].requested_at,lessonRangeTime(3,3).requestedAt);
+    assert.equal(calls.inserted[0].requested_until,lessonRangeTime(3,3).requestedUntil);
+    assert.ok(calls.filters.some(([table,column,value])=>table==="request"&&column==="izin_type"&&value==="masuk_kelas"));
+  }
+});
+
+test("izin masuk tetap menolak guru, bukti kosong, jam salah dan pengajuan ganda", async()=>{
+  for(const setting of [{role:"guru_mapel"},{duplicate:true}]){
+    const {actions,calls}=actionEnvironment(setting);const data=form();data.set("izin_type","masuk_kelas");
+    assert.ok((await actions.createPermissionRequest({},data)).error);assert.equal(calls.uploads,0);assert.equal(calls.inserted.length,0);
+  }
+  for(const period of ["0","12","1.5",""]){
+    const {actions,calls}=actionEnvironment();const data=form(period);data.set("izin_type","masuk_kelas");
+    assert.ok((await actions.createPermissionRequest({},data)).error);assert.equal(calls.uploads,0);
+  }
+  const {actions,calls}=actionEnvironment();const data=form();data.set("izin_type","masuk_kelas");data.delete("evidence");
+  assert.match((await actions.createPermissionRequest({},data)).error,/Bukti pendukung wajib/);assert.equal(calls.inserted.length,0);
+});
+
+test("database tanpa jenis izin masuk memberi pesan aktivasi sebelum bukti diunggah",async()=>{
+  const {actions,calls}=actionEnvironment({pendingError:{code:"22P02"}});const data=form();data.set("izin_type","masuk_kelas");
+  assert.match((await actions.createPermissionRequest({},data)).error,/belum diaktifkan di database/);
+  assert.equal(calls.uploads,0);assert.equal(calls.inserted.length,0);
+});
+
+test("menu izin masuk hanya tersedia untuk siswa dan masuk ke jalur formulir tersendiri",()=>{
+  const {navItemsForRole,activeNavHref}=load("src/lib/navigation");
+  assert.equal(activeNavHref("/izin/masuk-kelas",navItemsForRole("siswa")),"/izin/masuk-kelas");
+  for(const role of ["guru_mapel","wali_kelas","guru_bk","admin"])assert.ok(!navItemsForRole(role).some(item=>item.href==="/izin/masuk-kelas"));
 });
 
 test("rentang menghitung jam akhir tanpa memberi nomor pada waktu istirahat",()=>{
