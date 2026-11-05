@@ -12,13 +12,12 @@ import type { Profile } from "@/types";
  * sekali per request (mis. dipakai bersama oleh layout & page).
  */
 
-/** User Supabase terverifikasi, atau null bila belum login. */
+/** Identitas dari JWT yang sudah diverifikasi Supabase. Peran dibaca dari profil. */
 export const getSessionUser = cache(async () => {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  return user;
+  const { data, error } = await supabase.auth.getClaims();
+  if (error || !data?.claims.sub) return null;
+  return { id: data.claims.sub, email: data.claims.email };
 });
 
 /** Profil (termasuk role) pengguna yang sedang login, atau null. */

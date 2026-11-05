@@ -12,7 +12,6 @@ import {
   DAY_LABELS,
   IZIN_TYPES,
   IZIN_TYPE_LABELS,
-  REQUEST_STATUS,
   REQUEST_TITLE_MAX_LENGTH,
   REQUEST_REASON_MAX_LENGTH,
   ROLES,
@@ -76,6 +75,9 @@ export async function createPermissionRequest(
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Input tidak valid." };
   }
+  if (!profile.class_id) {
+    return { error: "Anda belum terdaftar di kelas. Hubungi Admin sebelum mengajukan izin." };
+  }
 
   const evidencePath = formData.get("evidence_path");
   const ownerPrefix = `${profile.id}/`;
@@ -94,48 +96,21 @@ export async function createPermissionRequest(
     .eq("student_id", profile.id)
     .eq("evidence_url", evidencePath)
     .maybeSingle();
-  const submitted = await findSubmitted();
-  if (submitted.error) return { error: "Status pengajuan belum dapat diperiksa. Silakan coba lagi." };
-  if (submitted.data) return confirmSubmission();
-
-  const routing = await lookupSchedule(parsed.data.lesson_period_start);
-  if (routing.status === "no_class") return { error: "Anda belum terdaftar di kelas. Hubungi Admin sebelum mengajukan izin." };
-  if (routing.status === "error") return { error: routing.message };
-  if (routing.status === "fallback" && !routing.approver) return { error: "Guru pada jam pelajaran ini dan wali kelas belum tersedia. Hubungi Admin untuk melengkapi jadwal atau wali kelas." };
-
-  // Cegah pengajuan dobel: satu pengajuan menunggu per jenis izin (migrasi 0012).
-  const duplicateMsg = `Masih ada pengajuan "${IZIN_TYPE_LABELS[parsed.data.izin_type]}" yang menunggu persetujuan. Tunggu keputusannya atau batalkan dulu di menu Riwayat.`;
-  const { data: pendingSame, error: pendingError } = await supabase
-    .from("permission_requests")
-    .select("id, evidence_url")
-    .eq("student_id", profile.id)
-    .eq("izin_type", parsed.data.izin_type)
-    .eq("status", REQUEST_STATUS.PENDING)
-    .limit(1)
-    .maybeSingle();
-  if (pendingError) {
-    if (pendingError.code === "22P02" && parsed.data.izin_type === IZIN_TYPES.MASUK_KELAS) {
-      return { error: "Izin Masuk Kelas belum diaktifkan di database. Hubungi admin untuk mengaktifkannya." };
-    }
-    return { error: "Pengajuan yang masih menunggu belum dapat diperiksa. Silakan coba lagi." };
-  }
-  if (pendingSame) {
-    if (pendingSame.id === requestId.data && pendingSame.evidence_url === evidencePath) return confirmSubmission();
-    return { error: duplicateMsg };
-  }
 
   const { data: stored, error: storageError } = await supabase.storage
     .from(STORAGE_BUCKETS.EVIDENCE).info(evidencePath);
-  if (storageError || !stored) {
-    return { error: "Bukti belum dapat diperiksa. Coba kirim lagi atau pilih kembali berkasnya." };
+  const validationError = storageError || !stored
+    ? "Bukti belum dapat diperiksa. Coba kirim lagi atau pilih kembali berkasnya."
+    : evidenceError(stored.size ?? stored.metadata?.size, stored.contentType ?? stored.metadata?.mimetype);
+  if (validationError) {
+    const submitted = await findSubmitted();
+    if (submitted.data) return confirmSubmission();
+    return { error: validationError };
   }
-  const validationError = evidenceError(stored.size ?? stored.metadata?.size, stored.contentType ?? stored.metadata?.mimetype);
-  if (validationError) return { error: validationError };
 
   const { requestedAt, requestedUntil } = lessonRangeTime(parsed.data.lesson_period_start, parsed.data.lesson_period_end);
 
-  // Insert pengajuan dalam kondisi awal bersih. Kolom status/current_layer &
-  // approver dibiarkan default (pending, lapis 1, null) sesuai policy RLS.
+  // Database memeriksa duplikat dan menetapkan guru dalam transaksi yang sama.
   const { error: insertError } = await supabase
     .from("permission_requests")
     .insert({
@@ -155,7 +130,14 @@ export async function createPermissionRequest(
     if (insertError.code === "23505") {
       const retry = await findSubmitted();
       if (retry.data) return confirmSubmission();
-      return { error: duplicateMsg };
+      if (retry.error) return { error: "Status pengajuan belum dapat diperiksa. Silakan coba lagi." };
+      return { error: `Masih ada pengajuan "${IZIN_TYPE_LABELS[parsed.data.izin_type]}" yang menunggu persetujuan. Tunggu keputusannya atau batalkan dulu di menu Riwayat.` };
+    }
+    if (insertError.code === "P0001" && insertError.message.includes("wali kelas belum tersedia")) {
+      return { error: "Guru pada jam pelajaran ini dan wali kelas belum tersedia. Hubungi Admin untuk melengkapi jadwal atau wali kelas." };
+    }
+    if (insertError.code === "22P02" && parsed.data.izin_type === IZIN_TYPES.MASUK_KELAS) {
+      return { error: "Izin Masuk Kelas belum diaktifkan di database. Hubungi admin untuk mengaktifkannya." };
     }
     if (insertError.code === "PGRST204" || insertError.code === "42703") return { error: "Form izin memerlukan pembaruan database. Hubungi administrator SIPENSI." };
     return { error: `Gagal menyimpan pengajuan: ${insertError.message}` };
@@ -183,73 +165,44 @@ export type LookupResult =
   | { status: "no_class" };
 
 export async function lookupSchedule(periodNumber: number | string): Promise<LookupResult> {
-  const profile = await getProfile();
-  if (!profile || profile.role !== ROLES.SISWA || !profile.class_id) return { status: "no_class" };
   const parsedPeriod = z.coerce.number().int().min(1).max(11).safeParse(periodNumber);
   if (!parsedPeriod.success) return { status: "choose_period" };
+  const profile = await getProfile();
+  if (!profile || profile.role !== ROLES.SISWA || !profile.class_id) return { status: "no_class" };
 
   const { day: dow, time, period } = lessonRequestTime(parsedPeriod.data);
   const dayLabel = DAY_LABELS[dow] ?? "";
 
   // Service role: hanya membaca jadwal/guru untuk kelas siswa itu sendiri.
   const admin = createAdminClient();
-  const { data: daySchedules, error: schedulesError } = await admin
-    .from("schedules")
-    .select("id, subject_id, teacher_id, start_time, end_time")
-    .eq("class_id", profile.class_id)
-    .eq("day_of_week", dow)
-    .order("start_time", { ascending: true });
+  const { data: klass, error: schedulesError } = await admin
+    .from("classes")
+    .select(`
+      homeroom:profiles!classes_homeroom_teacher_id_fkey(full_name, role),
+      schedules(
+        teacher:profiles!schedules_teacher_id_fkey(full_name, role),
+        subject:subjects(name)
+      )
+    `)
+    .eq("id", profile.class_id)
+    .eq("schedules.day_of_week", dow)
+    .lte("schedules.start_time", time)
+    .gt("schedules.end_time", time)
+    .order("start_time", { referencedTable: "schedules", ascending: true })
+    .order("id", { referencedTable: "schedules", ascending: true })
+    .maybeSingle();
   if (schedulesError) return { status: "error", message: "Jadwal belum dapat dibaca. Silakan coba lagi sebelum mengirim pengajuan." };
-
-  const list = daySchedules ?? [];
-  const idx = list.findIndex((s) => s.teacher_id && time >= s.start_time && time < s.end_time);
-
-  if (idx === -1) {
-    const { data: klass, error: classError } = await admin
-      .from("classes")
-      .select("homeroom_teacher_id")
-      .eq("id", profile.class_id)
-      .maybeSingle();
-    if (classError) return { status: "error", message: "Data wali kelas belum dapat dibaca. Silakan coba lagi." };
-    let approver: string | null = null;
-    if (klass?.homeroom_teacher_id) {
-      const { data: t, error: teacherError } = await admin
-        .from("profiles")
-        .select("full_name, role")
-        .eq("id", klass.homeroom_teacher_id)
-        .maybeSingle();
-      if (teacherError) return { status: "error", message: "Data wali kelas belum dapat dibaca. Silakan coba lagi." };
-      approver = t?.role && t.role !== ROLES.SISWA ? t.full_name : null;
-    }
+  if (!klass) return { status: "no_class" };
+  const match = klass.schedules.find((schedule) => schedule.teacher && schedule.teacher.role !== ROLES.SISWA);
+  if (!match) {
+    const approver = klass.homeroom && klass.homeroom.role !== ROLES.SISWA ? klass.homeroom.full_name : null;
     return { status: "fallback", day: dayLabel, approver };
-  }
-
-  const match = list[idx];
-  let subject: string | null = null;
-  let teacher: string | null = null;
-  if (match.subject_id) {
-    const { data: s, error } = await admin
-      .from("subjects")
-      .select("name")
-      .eq("id", match.subject_id)
-      .maybeSingle();
-    if (error) return { status: "error", message: "Data mata pelajaran belum dapat dibaca. Silakan coba lagi." };
-    subject = s?.name ?? null;
-  }
-  if (match.teacher_id) {
-    const { data: t, error } = await admin
-      .from("profiles")
-      .select("full_name, role")
-      .eq("id", match.teacher_id)
-      .maybeSingle();
-    if (error || !t || t.role === ROLES.SISWA) return { status: "error", message: "Guru penanggung jawab pada jadwal belum tersedia. Hubungi Admin." };
-    teacher = t?.full_name ?? null;
   }
 
   return {
     status: "found",
-    subject,
-    teacher,
+    subject: match.subject?.name ?? null,
+    teacher: match.teacher?.full_name ?? null,
     period: period.number,
     start: period.start,
     end: period.end,

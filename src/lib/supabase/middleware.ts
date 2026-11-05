@@ -25,6 +25,7 @@ export async function updateSession(request: NextRequest) {
   if (request.nextUrl.pathname === CHAT_ENDPOINT) return NextResponse.next({ request });
 
   let supabaseResponse = NextResponse.next({ request });
+  const authHeaders: Record<string, string> = {};
 
   const supabase = createServerClient<Database>(
     env.NEXT_PUBLIC_SUPABASE_URL,
@@ -34,7 +35,7 @@ export async function updateSession(request: NextRequest) {
         getAll() {
           return request.cookies.getAll();
         },
-        setAll(cookiesToSet) {
+        setAll(cookiesToSet, headers) {
           cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value),
           );
@@ -42,35 +43,35 @@ export async function updateSession(request: NextRequest) {
           cookiesToSet.forEach(({ name, value, options }) =>
             supabaseResponse.cookies.set(name, value, options),
           );
+          Object.assign(authHeaders, headers);
+          for (const [name, value] of Object.entries(authHeaders)) {
+            supabaseResponse.headers.set(name, value);
+          }
         },
       },
     },
   );
 
-  // PENTING: jangan sisipkan kode antara createServerClient dan getUser().
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { data, error } = await supabase.auth.getClaims();
+  const hasSession = !error && !!data?.claims.sub;
 
   const { pathname } = request.nextUrl;
+  const url = request.nextUrl.clone();
 
   // Belum login & mengakses rute terproteksi -> arahkan ke login.
-  if (!user && !isPublicPath(pathname)) {
-    const url = request.nextUrl.clone();
+  if (!hasSession && !isPublicPath(pathname)) {
     url.pathname = LOGIN_PATH;
     url.search = "";
     // Simpan tujuan awal (termasuk query) agar setelah login kembali ke sana.
     url.searchParams.set("redirectedFrom", pathname + request.nextUrl.search);
-    return NextResponse.redirect(url);
-  }
-
-  // Sudah login tapi membuka halaman login -> arahkan ke dashboard.
-  if (user && pathname === LOGIN_PATH) {
-    const url = request.nextUrl.clone();
+  } else if (hasSession && pathname === LOGIN_PATH) {
     url.pathname = "/dashboard";
     url.search = "";
-    return NextResponse.redirect(url);
+  } else {
+    return supabaseResponse;
   }
 
-  return supabaseResponse;
+  const response = NextResponse.redirect(url, { headers: authHeaders });
+  for (const cookie of supabaseResponse.cookies.getAll()) response.cookies.set(cookie);
+  return response;
 }

@@ -23,6 +23,7 @@ const fieldClass = "h-11 rounded-lg border-[#a5a7ae] bg-white text-base shadow-n
 export default function PermissionRequestForm({ entry = false }: { entry?: boolean }) {
   const router = useRouter();
   const uploadRef = useRef<{ file: File; path: string; uploaded: boolean } | null>(null);
+  const [saving, setSaving] = useState(false);
   const [state, formProps, pending] = useFormAction(async (previous, formData) => {
     const file = formData.get("evidence");
     if (!(file instanceof File)) return { error: "Bukti pendukung wajib dilampirkan." };
@@ -33,7 +34,9 @@ export default function PermissionRequestForm({ entry = false }: { entry?: boole
     try {
       const supabase = createClient();
       if (!upload || upload.file !== file) {
-        const { data: { user } } = await supabase.auth.getUser();
+        // ID di sini hanya menentukan folder. Storage dan server memverifikasi sesi.
+        const { data: { session } } = await supabase.auth.getSession();
+        const user = session?.user;
         if (!user) return { error: "Sesi tidak valid. Silakan login ulang." };
         upload = { file, path: createEvidencePath(user.id, file.type), uploaded: false };
         uploadRef.current = upload;
@@ -57,12 +60,15 @@ export default function PermissionRequestForm({ entry = false }: { entry?: boole
 
     formData.delete("evidence");
     formData.set("evidence_path", upload.path);
+    setSaving(true);
     try {
       const result = await createPermissionRequest(previous, formData);
       if (result.ok) router.push("/izin?ok=1");
       return result;
     } catch {
       return { error: "Status pengajuan belum dapat dipastikan. Periksa koneksi lalu coba kirim lagi." };
+    } finally {
+      setSaving(false);
     }
   }, initialState);
   const [startPeriod, setStartPeriod] = useState("");
@@ -73,13 +79,14 @@ export default function PermissionRequestForm({ entry = false }: { entry?: boole
   const [previewPending, startPreview] = useTransition();
 
   useEffect(() => {
+    if (!startPeriod) return;
     let active = true;
     const handle = setTimeout(() => {
       startPreview(async () => {
         const result = await lookupSchedule(startPeriod).catch((): LookupResult => ({ status: "error", message: "Jadwal belum dapat dimuat. Periksa koneksi lalu pilih kembali jam pelajaran." }));
         if (active) setPreview(result);
       });
-    }, 350);
+    }, 150);
     return () => { active = false; clearTimeout(handle); };
   }, [startPeriod]);
 
@@ -88,7 +95,7 @@ export default function PermissionRequestForm({ entry = false }: { entry?: boole
   const timeLabel = lessonRangeLabel(Number(startPeriod), Number(selectedEnd));
 
   return <div className="grid min-w-0 items-start gap-5 pt-2 lg:grid-cols-[minmax(0,1.85fr)_minmax(240px,1fr)] lg:pt-3">
-    <form {...formProps} className="student-panel flex min-w-0 flex-col gap-3.5 p-5 sm:p-7">
+    <form {...formProps} aria-busy={pending} className="student-panel flex min-w-0 flex-col gap-3.5 p-5 sm:p-7">
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="reason" className="text-[11px] font-medium">Alasan</Label>
         <Input id="reason" name="reason" required minLength={5} maxLength={REQUEST_TITLE_MAX_LENGTH} placeholder="Tulis alasan maks. 20 karakter" className={fieldClass} />
@@ -151,7 +158,7 @@ export default function PermissionRequestForm({ entry = false }: { entry?: boole
       </div>
       {state.error ? <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{state.error}</p> : null}
       <div className="flex flex-wrap gap-2">
-        <button type="submit" className="student-button" disabled={!canSubmit}>{pending ? "Mengirim…" : "Kirim Pengajuan"}</button>
+        <button type="submit" className="student-button" disabled={!canSubmit}>{pending ? (saving ? "Menyimpan pengajuan…" : "Mengunggah bukti…") : "Kirim Pengajuan"}</button>
         <Link href="/izin" className="inline-flex min-h-[38px] items-center justify-center rounded-full border border-zinc-700 px-6 text-xs hover:bg-zinc-50">Batal</Link>
       </div>
     </form>

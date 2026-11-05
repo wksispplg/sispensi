@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { Clock3, Plus } from "lucide-react";
+import { Clock3, LogIn, Plus } from "lucide-react";
 import { StudentEmpty, StudentRequestRows, type StudentRequest, type StudentStatistics } from "@/features/izin/student-view";
+import { STUDENT_ENTRY_PATH } from "@/lib/constants";
 import type { Profile } from "@/types";
 
 export function StudentDashboard({ profile, requests: list, statistics, failed }: { profile: Profile; requests: StudentRequest[]; statistics: StudentStatistics; failed: boolean }) {
@@ -16,7 +17,10 @@ export function StudentDashboard({ profile, requests: list, statistics, failed }
         <p className="text-xs leading-5 font-light text-[#bdc7ce]">Selamat datang{profile.nis ? `, ${profile.nis}` : ""}</p>
         <h2 className="mt-0.5 text-xl leading-8 font-medium tracking-tight wrap-anywhere sm:text-2xl">{profile.full_name?.trim() || "Siswa"}</h2>
       </div>
-      <Link href="/izin/ajukan" className="student-button w-fit shrink-0">Ajukan Dispen <Plus className="size-4" strokeWidth={1.5} aria-hidden /></Link>
+      <div className="flex flex-wrap gap-2 sm:shrink-0">
+        <Link href="/izin/ajukan" className="student-button whitespace-nowrap">Ajukan Dispen <Plus className="size-4" strokeWidth={1.5} aria-hidden /></Link>
+        <Link href={STUDENT_ENTRY_PATH} className="student-button whitespace-nowrap">Izin Masuk <LogIn className="size-4" strokeWidth={1.5} aria-hidden /></Link>
+      </div>
     </section>
     {failed ? <p role="alert" className="rounded-xl bg-red-50 p-4 text-sm text-red-700">Data pengajuan belum dapat dimuat. Silakan muat ulang halaman.</p> : <>
       <section aria-label="Statistik pengajuan" className="grid grid-cols-2 gap-3 sm:grid-cols-4">

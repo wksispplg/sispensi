@@ -226,7 +226,7 @@ test("aksi pemindai menerima guru/admin dan menolak siswa sebelum membaca data",
     const loader = createTsLoader({
       "next/navigation": { redirect: (url) => { throw new Error(`REDIRECT ${url}`); } },
       "@/lib/supabase/server": { createClient: async () => ({
-        auth: { getUser: async () => ({ data: { user: { id: "viewer" } } }) },
+        auth: { getClaims: async () => ({ data: { claims: { sub: "viewer" } }, error: null }) },
         from: () => ({ select() { return this; }, eq() { return this; }, maybeSingle: async () => ({ data: { id: "viewer", role } }) }),
       }) },
       "@/lib/supabase/admin": { createAdminClient: () => { adminReads++; return admin; } },

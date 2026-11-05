@@ -28,16 +28,27 @@ test("tanggal otomatis WIB tetap benar saat hari/tahun UTC berbeda", () => {
 const requestId = "70000000-0000-4000-8000-000000000001";
 const evidencePath = `student/${requestId}.png`;
 
-function actionEnvironment({ missingTeacher=false, noClass=false, role="siswa", pendingError=null, duplicate=false, stored={ size:1024, contentType:"image/png" } }={}) {
-  const calls = { inserted:[], evidenceChecks:[], filters:[] };
+function actionEnvironment({ missingTeacher=false, noClass=false, role="siswa", insertError=null, duplicate=false, homeroom=null, stored={ size:1024, contentType:"image/png" } }={}) {
+  const calls = { inserted:[], evidenceChecks:[], filters:[], scheduleReads:0 };
   const profile = { id:"student", role, class_id:noClass?null:"class" };
   const admin = { from(table) {
-    const q = {
-      select(){return q;}, eq(column,value){ calls.filters.push([table,column,value]); return q; },
-      async order(){return {data: missingTeacher?[]:[{id:"schedule",teacher_id:"teacher",subject_id:"subject",start_time:"09:00:00",end_time:"10:20:00"}],error:null};},
-      async maybeSingle(){return {data:table==="classes"?{homeroom_teacher_id:null}:table==="subjects"?{name:"Mapel Contoh"}:{full_name:"Guru Contoh",role:"guru_bk"},error:null};},
-    };return q;
-  }};
+    assert.equal(table, "classes");
+    const query = {
+      select() { return query; },
+      eq(column, value) { calls.filters.push([table, column, value]); return query; },
+      lte(column, value) { calls.filters.push([table, column, value]); return query; },
+      gt(column, value) { calls.filters.push([table, column, value]); return query; },
+      order() { return query; },
+      async maybeSingle() {
+        calls.scheduleReads++;
+        return { data: { homeroom, schedules: missingTeacher ? [] : [{
+          teacher: { full_name: "Guru Contoh", role: "guru_bk" },
+          subject: { name: "Mapel Contoh" },
+        }] }, error: null };
+      },
+    };
+    return query;
+  } };
   const storage = { from: () => ({ async info(path) {
     calls.evidenceChecks.push(path);
     return { data: stored, error: null };
@@ -57,9 +68,15 @@ function actionEnvironment({ missingTeacher=false, noClass=false, role="siswa", 
           const saved = calls.inserted.find(row => row.id === filters.get("id") && row.student_id === filters.get("student_id") && row.evidence_url === filters.get("evidence_url"));
           return { data: saved ?? null, error: null };
         }
-        return { data: duplicate ? { id: "pending-request" } : null, error: pendingError };
+        throw new Error("Pengajuan hanya boleh membaca kembali ID yang sudah dikirim.");
       },
-      async insert(row) { calls.inserted.push(row); return { error: null }; },
+      async insert(row) {
+        if (insertError) return { error: insertError };
+        if (missingTeacher) return { error: { code: "P0001", message: "Guru pada waktu izin dan wali kelas belum tersedia." } };
+        if (duplicate || calls.inserted.some(item => item.id === row.id)) return { error: { code: "23505" } };
+        calls.inserted.push(row);
+        return { error: null };
+      },
     };
     return query;
   } };
@@ -73,13 +90,19 @@ function actionEnvironment({ missingTeacher=false, noClass=false, role="siswa", 
 }
 
 test("pratinjau memakai nomor jam sekolah, bukan urutan jadwal", async () => {
-  const {actions}=actionEnvironment();
+  const {actions,calls}=actionEnvironment();
   const preview=await actions.lookupSchedule(3);
   assert.equal(preview.status,"found");
   assert.equal(preview.period,3); // Hanya ada satu baris jadwal di fixture ini.
   assert.equal(preview.start,"09:00");
   assert.equal(preview.end,"09:40");
   assert.equal((await actions.lookupSchedule(0)).status,"choose_period");
+  assert.equal(calls.scheduleReads, 1);
+  assert.ok(calls.filters.some(([,column,value])=>column==="schedules.start_time"&&value==="09:00:00"));
+  assert.ok(calls.filters.some(([,column,value])=>column==="schedules.end_time"&&value==="09:00:00"));
+  const fallback=actionEnvironment({missingTeacher:true,homeroom:{full_name:"Wali Contoh",role:"wali_kelas"}});
+  assert.equal((await fallback.actions.lookupSchedule(3)).approver,"Wali Contoh");
+  assert.equal(fallback.calls.scheduleReads,1);
 });
 
 function form(period="3", end=period) {
@@ -99,6 +122,8 @@ test("pengajuan menyimpan waktu jam terpilih dan mengabaikan tanggal titipan bro
   assert.equal(Object.hasOwn(calls.inserted[0],"duration_minutes"),false);
   assert.equal(calls.inserted[0].class_id,"class");
   assert.deepEqual(calls.evidenceChecks, [evidencePath]);
+  assert.equal(calls.scheduleReads,0);
+  assert.deepEqual(calls.filters,[]);
 });
 
 test("nomor jam salah, kelas kosong dan guru kosong tidak menyimpan pengajuan", async () => {
@@ -110,9 +135,10 @@ test("nomor jam salah, kelas kosong dan guru kosong tidak menyimpan pengajuan", 
   }
   for (const settings of [{noClass:true},{missingTeacher:true}]) {
     const {actions,calls}=actionEnvironment(settings);
-    assert.ok((await actions.createPermissionRequest({},form())).error);
+    const result = await actions.createPermissionRequest({},form());
+    assert.match(result.error, settings.missingTeacher ? /wali kelas belum tersedia/ : /belum terdaftar di kelas/);
     assert.equal(calls.inserted.length,0);
-    assert.equal(calls.evidenceChecks.length,0);
+    assert.equal(calls.evidenceChecks.length, settings.missingTeacher ? 1 : 0);
   }
   const {actions,calls}=actionEnvironment();
   assert.ok((await actions.createPermissionRequest({},form("7","3"))).error);
@@ -174,14 +200,14 @@ test("izin masuk menyimpan satu jam mapel dan mengabaikan jam akhir titipan brow
     assert.equal(calls.inserted[0].lesson_period_end,3);
     assert.equal(calls.inserted[0].requested_at,lessonRangeTime(3,3).requestedAt);
     assert.equal(calls.inserted[0].requested_until,lessonRangeTime(3,3).requestedUntil);
-    assert.ok(calls.filters.some(([table,column,value])=>table==="request"&&column==="izin_type"&&value==="masuk_kelas"));
+    assert.equal(calls.scheduleReads,0);
   }
 });
 
 test("izin masuk tetap menolak guru, bukti kosong, jam salah dan pengajuan ganda", async()=>{
   for(const setting of [{role:"guru_mapel"},{duplicate:true}]){
     const {actions,calls}=actionEnvironment(setting);const data=form();data.set("izin_type","masuk_kelas");
-    assert.ok((await actions.createPermissionRequest({},data)).error);assert.equal(calls.evidenceChecks.length,0);assert.equal(calls.inserted.length,0);
+    assert.ok((await actions.createPermissionRequest({},data)).error);assert.equal(calls.evidenceChecks.length,setting.duplicate?1:0);assert.equal(calls.inserted.length,0);
   }
   for(const period of ["0","12","1.5",""]){
     const {actions,calls}=actionEnvironment();const data=form(period);data.set("izin_type","masuk_kelas");
@@ -192,9 +218,9 @@ test("izin masuk tetap menolak guru, bukti kosong, jam salah dan pengajuan ganda
 });
 
 test("database tanpa jenis izin masuk memberi pesan aktivasi sebelum pengajuan disimpan",async()=>{
-  const {actions,calls}=actionEnvironment({pendingError:{code:"22P02"}});const data=form();data.set("izin_type","masuk_kelas");
+  const {actions,calls}=actionEnvironment({insertError:{code:"22P02"}});const data=form();data.set("izin_type","masuk_kelas");
   assert.match((await actions.createPermissionRequest({},data)).error,/belum diaktifkan di database/);
-  assert.equal(calls.evidenceChecks.length,0);assert.equal(calls.inserted.length,0);
+  assert.equal(calls.evidenceChecks.length,1);assert.equal(calls.inserted.length,0);
 });
 
 test("bukti 5 MB diunggah sekali, percobaan ulang mengirim formulir kecil dan membuka riwayat", async () => {
@@ -209,7 +235,7 @@ test("bukti 5 MB diunggah sekali, percobaan ulang mengirim formulir kecil dan me
     "next/navigation": { useRouter: () => ({ push: url => navigations.push(url) }) },
     "@/hooks/use-form-action": { useFormAction(action) { submit = action; return [{}, {}, false]; } },
     "@/lib/supabase/client": { createClient: () => ({
-      auth: { async getUser() { return { data: { user: { id: "student" } } }; } },
+      auth: { async getSession() { return { data: { session: { user: { id: "student" } } } }; } },
       storage: { from: () => ({ async upload(path, uploaded) {
         assert.equal(uploaded, file);
         uploadedPath = path;
@@ -252,7 +278,7 @@ test("pengajuan memeriksa kepemilikan dan metadata bukti, serta aman dikirim ula
   assert.equal(calls.inserted.length, 1);
   assert.equal(calls.inserted[0].id, requestId);
   assert.equal(calls.inserted[0].evidence_url, evidencePath);
-  assert.deepEqual(calls.evidenceChecks, [evidencePath]);
+  assert.deepEqual(calls.evidenceChecks, [evidencePath,evidencePath]);
 
   for (const stored of [null, { size: 5 * 1024 * 1024 + 1, contentType: "image/png" }, { size: 1024, contentType: "text/html" }]) {
     const invalid = actionEnvironment({ stored });

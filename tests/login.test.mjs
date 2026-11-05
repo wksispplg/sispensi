@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { NextRequest } from "next/server.js";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createTsLoader } from "./helpers/load-ts.mjs";
@@ -85,5 +86,57 @@ test("dashboard mengambil nama dan NIS dari profil sesi siswa, bukan nama dari c
     const html=renderToStaticMarkup(element);
     assert.deepEqual(owners,[id]);assert.match(html,new RegExp(name));assert.match(html,new RegExp(`Selamat datang, ${nis}`));
     assert.doesNotMatch(html,/Khansa Veasna|541241109/);
+  }
+});
+
+test("profil server memakai identitas JWT terverifikasi dan membaca peran dari database", async () => {
+  const student = { id: "siswa-uji", role: "siswa" };
+  const verified = { data: { claims: { sub: student.id, email: "siswa@example.com", role: "admin" } }, error: null };
+  for (const claims of [verified, { data: null, error: new Error("Token kedaluwarsa") }]) {
+    const lookups = [];
+    const loader = createTsLoader({
+      "@/lib/supabase/server": { createClient: async () => ({
+        auth: { getClaims: async () => claims },
+        from(table) {
+          assert.equal(table, "profiles");
+          const query = {
+            select: () => query,
+            eq(column, value) { lookups.push([column, value]); return query; },
+            maybeSingle: async () => ({ data: student }),
+          };
+          return query;
+        },
+      }) },
+    });
+    const { getProfile } = loader("src/lib/auth");
+    assert.deepEqual(await getProfile(), claims.error ? null : student);
+    assert.deepEqual(lookups, claims.error ? [] : [["id", student.id]]);
+  }
+});
+
+test("proxy tetap menjaga tujuan login dan membawa cookie sesi yang disegarkan", async () => {
+  for (const signedIn of [true, false]) {
+    const loader = createTsLoader({
+      "@/lib/env": { env: {} },
+      "@supabase/ssr": { createServerClient: (_url, _key, { cookies }) => ({
+        auth: { async getClaims() {
+          if (!signedIn) return { data: null, error: new Error("Sesi tidak valid") };
+          cookies.setAll(
+            [{ name: "session-test", value: "refreshed", options: { path: "/" } }],
+            { "Cache-Control": "private, no-store" },
+          );
+          return { data: { claims: { sub: "siswa-uji" } }, error: null };
+        } },
+      }) },
+    });
+    const { updateSession } = loader("src/lib/supabase/middleware");
+    const response = await updateSession(new NextRequest(`https://sis.example${signedIn ? "/login" : "/izin?status=pending"}`));
+    const destination = new URL(response.headers.get("location"));
+    assert.equal(destination.pathname, signedIn ? "/dashboard" : "/login");
+    assert.equal(destination.searchParams.get("redirectedFrom"), signedIn ? null : "/izin?status=pending");
+    if (signedIn) {
+      assert.equal(response.cookies.get("session-test")?.value, "refreshed");
+      assert.equal(response.headers.get("Cache-Control"), "private, no-store");
+    }
   }
 });
