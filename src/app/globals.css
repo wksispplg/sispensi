@@ -325,7 +325,7 @@
   width: 214px;
   padding: 36px 20px 26px 18px;
 }
-.student-sidebar > a { font-size: 20px; }
+.student-sidebar .portal-sidebar-brand { font-size: 20px; }
 .student-sidebar nav a { min-height: 38px; font-size: 11px; }
 .student-sidebar nav svg { width: 14px; height: 14px; }
 .student-sidebar nav ul { gap: 8px; }
@@ -373,7 +373,7 @@
 
 /* Skala panel guru, BK, dan admin mengikuti referensi desktop. */
 .staff-sidebar { padding: 38px 22px 34px; overflow-y: auto; }
-.staff-sidebar > a { font-size: 24px; }
+.staff-sidebar .portal-sidebar-brand { font-size: 24px; }
 .staff-sidebar nav a { min-height: 44px; font-size: 12px; gap: 12px; }
 .staff-sidebar nav ul { gap: 12px; }
 .staff-sidebar nav svg { width: 17px; height: 17px; }
@@ -400,6 +400,7 @@
   .staff-sidebar { padding: clamp(32px, 3.6vw, 52px) clamp(18px, 2.2vw, 32px) 42px; }
   .staff-sidebar nav a { min-height: 46px; font-size: 14px; }
   .staff-sidebar nav ul { gap: 13px; }
-  .staff-sidebar > div:first-of-type { margin-top: 26px; }
-  .staff-sidebar > div:first-of-type > p { font-size: 12px; margin-bottom: 12px; }
+  .staff-sidebar.sidebar-collapsed { padding-inline: 12px; }
+  .staff-sidebar .portal-sidebar-menu { margin-top: 26px; }
+  .staff-sidebar .portal-sidebar-menu > p { font-size: 12px; margin-bottom: 12px; }
 }

@@ -24,6 +24,7 @@ import {
   DASHBOARD_PATH,
   STUDENT_LETTERS_PATH,
   STUDENT_ENTRY_PATH,
+  TEACHER_STUDENTS_PATH,
   NOTIFICATIONS_PATH,
   REKAP_PATH,
   SCAN_PATH,
@@ -71,6 +72,14 @@ const APPROVALS: NavItem = {
   title: "Perlu Persetujuan",
   description: "Tinjau pengajuan dan berikan keputusan.",
   icon: Plus,
+};
+
+const TEACHER_STUDENTS: NavItem = {
+  href: TEACHER_STUDENTS_PATH,
+  label: "Siswa",
+  title: "Siswa Saya",
+  description: "Lihat daftar siswa di kelas yang Anda ampu.",
+  icon: Users,
 };
 
 const NAV: Record<Role, NavItem[]> = {
@@ -123,6 +132,7 @@ const NAV: Record<Role, NavItem[]> = {
       icon: History,
     },
     SCAN,
+    TEACHER_STUDENTS,
     NOTIFICATIONS,
   ],
   [ROLES.WALI_KELAS]: [
@@ -136,6 +146,7 @@ const NAV: Record<Role, NavItem[]> = {
       icon: History,
     },
     SCAN,
+    TEACHER_STUDENTS,
     NOTIFICATIONS,
   ],
   [ROLES.GURU_BK]: [

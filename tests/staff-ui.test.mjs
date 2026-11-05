@@ -95,6 +95,8 @@ test("menu guru, BK dan admin tersedia tanpa fitur pemantauan yang sudah dihapus
   }
   assert.ok(navItemsForRole("admin").every(item=>!["/persetujuan","/riwayat-keputusan"].includes(item.href)));
   for(const role of ["guru_mapel","wali_kelas","guru_bk"])assert.ok(navItemsForRole(role).some(item=>item.href==="/persetujuan"));
+  for (const role of ["guru_mapel", "wali_kelas"]) assert.ok(navItemsForRole(role).some((item) => item.href === "/siswa-saya"));
+  for (const role of ["siswa", "guru_bk", "admin"]) assert.ok(!navItemsForRole(role).some((item) => item.href === "/siswa-saya"));
 });
 
 test("beranda guru tidak memuat contoh hitungan atau istilah pemantauan; menu admin tetap memakai data sekolah",()=>{
@@ -104,9 +106,68 @@ test("beranda guru tidak memuat contoh hitungan atau istilah pemantauan; menu ad
   const data={pending:[],recentDecisions:[],statistics:{total:23,approved:20,rejected:3,approvedToday:2},pendingCount:6,school:null,layer3Count:0,failed:false,now:Date.parse("2026-11-04T03:00:00Z")};
   const html=renderToStaticMarkup(React.createElement(Dashboard,{profile:{role:"guru_mapel",full_name:"Guru Contoh"},data}));
   assert.match(html,/Guru Contoh/);assert.match(html,/>23<\/p>/);assert.match(html,/Tinjau Pengajuan/);assert.doesNotMatch(html,/Sedang Dispen|Belum kembali|Pemantauan/);
+  assert.match(html, /href="\/siswa-saya"[^>]*>Lihat Siswa/);
   const admin=renderToStaticMarkup(React.createElement(Dashboard,{profile:{role:"admin",full_name:"Admin Contoh"},data:{...data,school:{students:100,teachers:10,classes:4,schedules:8}}}));
   assert.match(admin,/Total Siswa/);assert.match(admin,/Kelola Data Sekolah/);assert.match(admin,/href="\/admin\/siswa"/);
   assert.match(admin,/Total Jadwal/);assert.doesNotMatch(admin,/Persetujuan|Tinjau Pengajuan|Setujui|Tolak|href="\/persetujuan/);
+});
+
+test("daftar siswa guru memeriksa peran dan penugasan saat membuka kelas", async () => {
+  for (const role of ["guru_mapel", "wali_kelas", "siswa", "guru_bk", "admin"]) {
+    const reads = [];
+    const teacherId = "guru-uji";
+    const allowed = role === "guru_mapel" || role === "wali_kelas";
+    const classes = [
+      { id: "kelas-ajar", name: "X PPLG 1", homeroom_teacher_id: null },
+      { id: "kelas-wali", name: "X PPLG 2", homeroom_teacher_id: teacherId },
+    ];
+    const fakeClient = (privileged) => ({
+      from(table) {
+        assert.equal(table, "classes");
+        const read = { privileged, eq: [] };
+        reads.push(read);
+        const query = {
+          select(columns) { read.columns = columns; return query; },
+          eq(column, value) { read.eq.push([column, value]); return query; },
+          or(filter) { read.or = filter; return query; },
+          order() { return query; },
+          then(resolve) { return Promise.resolve({ data: classes, error: null }).then(resolve); },
+          async maybeSingle() {
+            return { data: { students: [{ id: "siswa-uji", full_name: "Siswa Contoh" }] }, error: null };
+          },
+        };
+        return query;
+      },
+    });
+    const loader = createTsLoader({
+      "next/form": (props) => React.createElement("form", props),
+      "@/lib/auth": { requireRole: async (...roles) => {
+        if (!roles.includes(role)) throw new Error("Akses ditolak");
+        return { id: teacherId };
+      } },
+      "@/lib/supabase/server": { createClient: async () => fakeClient(false) },
+      "@/lib/supabase/admin": { createAdminClient: () => fakeClient(true) },
+    });
+    const Page = loader("src/app/(app)/siswa-saya/page").default;
+    const page = Page({ searchParams: Promise.resolve({ kelas: "kelas-luar" }) });
+    if (!allowed) {
+      await assert.rejects(page, /Akses ditolak/);
+      assert.deepEqual(reads, []);
+      continue;
+    }
+    const html = renderToStaticMarkup(await page);
+    assert.match(html, /X PPLG 2 \(Wali Kelas\)/);
+    assert.match(html, /Siswa Contoh/);
+    assert.match(html, /1 siswa/);
+    assert.doesNotMatch(html, /kelas-luar/);
+    assert.deepEqual(reads.map((read) => read.privileged), [false, true]);
+    for (const read of reads) {
+      assert.equal(read.or, `homeroom_teacher_id.eq.${teacherId},teaching.not.is.null`);
+      assert.ok(read.eq.some(([column, value]) => column === "teaching.teacher_id" && value === teacherId));
+    }
+    assert.deepEqual(reads[1].eq, [["id", "kelas-wali"], ["teaching.teacher_id", teacherId], ["students.role", "siswa"]]);
+    assert.match(reads[1].columns, /profiles_class_id_fkey\(id, full_name\)/);
+  }
 });
 
 test("halaman notifikasi admin tidak memuat antrean keputusan cepat",async()=>{

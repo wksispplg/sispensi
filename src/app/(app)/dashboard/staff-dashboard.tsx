@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { ArrowUpRight, Clock3 } from "lucide-react";
+import { ArrowUpRight, Clock3, Users } from "lucide-react";
 
-import { APPROVAL_HISTORY_PATH, APPROVALS_PATH, REKAP_PATH, ROLE_LABELS, ROLES } from "@/lib/constants";
+import { APPROVAL_HISTORY_PATH, APPROVALS_PATH, REKAP_PATH, ROLE_LABELS, ROLES, TEACHER_STUDENTS_PATH } from "@/lib/constants";
 import type { Profile } from "@/types";
 import type { getStaffDashboard } from "@/features/approvals/data";
 import { ApprovalList } from "@/features/approvals/approval-list";
@@ -31,6 +31,13 @@ export function StaffDashboard({ profile, data }: { profile: Profile; data: Awai
           {data.pending.length ? <ApprovalList requests={data.pending} now={data.now} compact /> : <StaffEmpty title="Semua pengajuan sudah ditinjau" description="Pengajuan yang perlu keputusan Anda akan muncul di sini." />}
         </section>
         <aside className="flex min-w-0 flex-col gap-5">
+          {(profile.role === ROLES.GURU_MAPEL || profile.role === ROLES.WALI_KELAS) && (
+            <section className="app-panel p-6">
+              <h3 className="flex items-center gap-2 text-sm font-medium">Siswa Saya <Users className="size-4" aria-hidden /></h3>
+              <p className="mt-2 text-xs leading-relaxed text-[#747983]">Daftar siswa di kelas yang Anda ampu.</p>
+              <Link href={TEACHER_STUDENTS_PATH} className="mt-2 inline-flex min-h-9 items-center gap-1.5 text-xs text-red-600 underline underline-offset-2">Lihat Siswa <ArrowUpRight className="size-3.5" aria-hidden /></Link>
+            </section>
+          )}
           <section className="app-panel p-6"><h3 className="mb-4 flex items-center gap-2 text-sm font-medium">Keputusan Terbaru <Clock3 className="size-4" strokeWidth={1.5} aria-hidden /></h3>
             {data.recentDecisions.length ? <ul className="divide-y divide-zinc-100">{data.recentDecisions.map((item) => <li key={item.id} className="py-3"><Link href={`/persetujuan/${item.id}`} className="block truncate text-xs font-medium hover:text-red-600">{item.studentName}</Link><p className="mt-1 truncate text-[11px] text-[#747983]">{requestTitle(item.reason)}</p><div className="mt-2 flex flex-wrap items-center gap-2"><StudentStatus status={item.status} />{item.decidedAt ? <span className="text-[10px] text-[#747983]">{staffDate.format(new Date(item.decidedAt))}</span> : null}</div></li>)}</ul> : <StaffEmpty title="Belum ada keputusan" />}
             <Link href={APPROVAL_HISTORY_PATH} className="mt-3 inline-flex min-h-9 items-center text-xs text-red-600 underline underline-offset-2">Lihat riwayat keputusan</Link>

@@ -1,12 +1,12 @@
 "use client";
 
-import type { CSSProperties, ReactNode } from "react";
+import { useState, type CSSProperties, type ReactNode } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { Bell, ChevronDown, LogOut } from "lucide-react";
 
-import { DASHBOARD_PATH, ROLE_LABELS, ROLES, STUDENT_LETTERS_PATH, STUDENT_ENTRY_PATH, NOTIFICATIONS_PATH } from "@/lib/constants";
+import { DASHBOARD_PATH, ROLE_LABELS, ROLES, STUDENT_LETTERS_PATH, STUDENT_ENTRY_PATH, NOTIFICATIONS_PATH, TEACHER_STUDENTS_PATH } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import type { Profile } from "@/types";
 import { DesktopNav, MobileNav } from "./app-nav";
@@ -25,6 +25,7 @@ export function AppShell({
 }
 
 function PortalShell({ profile, pathname, children }: { profile: Profile; pathname: string; children: ReactNode }) {
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const pages: Record<string, { title: string; description?: string }> = {
     [DASHBOARD_PATH]: { title: "Beranda", description: "Selamat datang!" },
     "/izin/ajukan": { title: "Ajukan Dispensasi", description: "Tulis deskripsi alasan dispensasi kamu" },
@@ -38,6 +39,7 @@ function PortalShell({ profile, pathname, children }: { profile: Profile; pathna
     [DASHBOARD_PATH]: { title: "Beranda", description: "Selamat datang!" },
     "/persetujuan": { title: "Perlu Persetujuan" },
     "/riwayat-keputusan": { title: "Riwayat Keputusan" },
+    [TEACHER_STUDENTS_PATH]: { title: "Siswa Saya", description: "Lihat daftar siswa di kelas yang Anda ampu." },
     [NOTIFICATIONS_PATH]: { title: "Notifikasi" },
     "/admin": { title: "Data Master", description: "Kelola data sekolah dalam satu tempat." },
     "/admin/siswa": { title: "Data Siswa", description: "Kelola akun siswa dan impor data sekolah." },
@@ -48,9 +50,12 @@ function PortalShell({ profile, pathname, children }: { profile: Profile; pathna
     "/scan": { title: "Scan QR Surat", description: "Periksa surat izin digital siswa." },
   };
   const page = (staff ? staffPages : pages)[pathname] ?? { title: "Detail Pengajuan", description: "Informasi dan status pengajuan izin." };
-  const style = { "--app-sidebar-width": staff ? "clamp(214px, 20.625vw, 297px)" : "214px" } as CSSProperties;
+  const isAdmin = profile.role === ROLES.ADMIN;
+  const collapsed = isAdmin && sidebarCollapsed;
+  const sidebarWidth = staff ? "clamp(214px, 20.625vw, 297px)" : "214px";
+  const style = { "--app-sidebar-width": collapsed ? "72px" : sidebarWidth } as CSSProperties;
   return <div style={style} className={cn("portal-app student-app min-h-svh flex-1 bg-[#f5f6f8]", staff && "staff-app")}>
-    <DesktopNav role={profile.role} />
+    <DesktopNav role={profile.role} collapsed={collapsed} onToggle={isAdmin ? () => setSidebarCollapsed((value) => !value) : undefined} />
     <div className="flex min-h-svh min-w-0 flex-col lg:pl-[var(--app-sidebar-width)]">
       <div className={cn("flex min-h-11 items-center justify-between gap-4 bg-[#343b41] px-4 text-white sm:px-7", staff && "staff-school-bar")}>
         <Link href={DASHBOARD_PATH} aria-label="Beranda SMK Telkom Purwokerto" className="flex items-center gap-1.5 py-2">

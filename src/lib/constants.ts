@@ -160,6 +160,7 @@ export const STUDENT_ENTRY_PATH = "/izin/masuk-kelas";
 export const NOTIFICATIONS_PATH = "/notifikasi";
 export const APPROVALS_PATH = "/persetujuan";
 export const APPROVAL_HISTORY_PATH = "/riwayat-keputusan";
+export const TEACHER_STUDENTS_PATH = "/siswa-saya";
 export const SCAN_PATH = "/scan";
 export const REKAP_PATH = "/rekap";
 export const ADMIN_HOME_PATH = "/admin";
