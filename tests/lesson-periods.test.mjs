@@ -25,8 +25,11 @@ test("tanggal otomatis WIB tetap benar saat hari/tahun UTC berbeda", () => {
   assert.equal(lessonRequestTime(11, new Date("2026-12-31T18:00:00Z")).requestedAt, "2027-01-01T08:20:00.000Z");
 });
 
-function actionEnvironment({ missingTeacher=false, noClass=false, role="siswa", pendingError=null, duplicate=false }={}) {
-  const calls = { inserted:[], uploads:0, removed:0, filters:[] };
+const requestId = "70000000-0000-4000-8000-000000000001";
+const evidencePath = `student/${requestId}.png`;
+
+function actionEnvironment({ missingTeacher=false, noClass=false, role="siswa", pendingError=null, duplicate=false, stored={ size:1024, contentType:"image/png" } }={}) {
+  const calls = { inserted:[], evidenceChecks:[], filters:[] };
   const profile = { id:"student", role, class_id:noClass?null:"class" };
   const admin = { from(table) {
     const q = {
@@ -35,14 +38,36 @@ function actionEnvironment({ missingTeacher=false, noClass=false, role="siswa", 
       async maybeSingle(){return {data:table==="classes"?{homeroom_teacher_id:null}:table==="subjects"?{name:"Mapel Contoh"}:{full_name:"Guru Contoh",role:"guru_bk"},error:null};},
     };return q;
   }};
-  const storage={from(){return {async upload(){calls.uploads++;return {error:null};},async remove(){calls.removed++;return {error:null};}};}};
-  const client={storage,from(){const q={select(){return q;},eq(column,value){calls.filters.push(["request",column,value]);return q;},limit(){return q;},async maybeSingle(){return {data:duplicate?{id:"pending-request"}:null,error:pendingError};},async insert(row){calls.inserted.push(row);return {error:null};}};return q;}};
+  const storage = { from: () => ({ async info(path) {
+    calls.evidenceChecks.push(path);
+    return { data: stored, error: null };
+  } }) };
+  const client = { storage, from() {
+    const filters = new Map();
+    const query = {
+      select() { return query; },
+      eq(column, value) {
+        calls.filters.push(["request", column, value]);
+        filters.set(column, value);
+        return query;
+      },
+      limit() { return query; },
+      async maybeSingle() {
+        if (filters.has("id")) {
+          const saved = calls.inserted.find(row => row.id === filters.get("id") && row.student_id === filters.get("student_id") && row.evidence_url === filters.get("evidence_url"));
+          return { data: saved ?? null, error: null };
+        }
+        return { data: duplicate ? { id: "pending-request" } : null, error: pendingError };
+      },
+      async insert(row) { calls.inserted.push(row); return { error: null }; },
+    };
+    return query;
+  } };
   const loader=createTsLoader({
     "@/lib/auth":{getProfile:async()=>profile},
     "@/lib/supabase/admin":{createAdminClient:()=>admin},
     "@/lib/supabase/server":{createClient:async()=>client},
     "next/cache":{revalidatePath(){}},
-    "next/navigation":{redirect:(url)=>{throw new Error("REDIRECT "+url);}},
   });
   return {actions:loader("src/app/(app)/izin/ajukan/actions"),calls};
 }
@@ -60,20 +85,20 @@ test("pratinjau memakai nomor jam sekolah, bukan urutan jadwal", async () => {
 function form(period="3", end=period) {
   const data=new FormData();data.set("izin_type","dispensasi");data.set("reason","Mengikuti kegiatan sekolah");
   data.set("lesson_period_start",period);data.set("lesson_period_end",end);
-  data.set("evidence",new File(["contoh"],"bukti.png",{type:"image/png"}));
+  data.set("evidence_path", evidencePath);
   return data;
 }
 
 test("pengajuan menyimpan waktu jam terpilih dan mengabaikan tanggal titipan browser", async () => {
   const {actions,calls}=actionEnvironment();
   const data=form("3","5");data.set("requested_at","2099-01-01T01:00:00Z");data.set("duration_minutes","90");
-  await assert.rejects(()=>actions.createPermissionRequest({},data),/REDIRECT \/izin\?ok=1/);
+  assert.deepEqual(await actions.createPermissionRequest({},data), { ok: true });
   assert.equal(calls.inserted[0].requested_at,lessonRequestTime(3).requestedAt);
   assert.equal(calls.inserted[0].requested_until,lessonRangeTime(3,5).requestedUntil);
   assert.equal(calls.inserted[0].lesson_period_start,3);assert.equal(calls.inserted[0].lesson_period_end,5);
   assert.equal(Object.hasOwn(calls.inserted[0],"duration_minutes"),false);
   assert.equal(calls.inserted[0].class_id,"class");
-  assert.equal(calls.uploads,1);
+  assert.deepEqual(calls.evidenceChecks, [evidencePath]);
 });
 
 test("nomor jam salah, kelas kosong dan guru kosong tidak menyimpan pengajuan", async () => {
@@ -81,13 +106,13 @@ test("nomor jam salah, kelas kosong dan guru kosong tidak menyimpan pengajuan", 
     const {actions,calls}=actionEnvironment();
     assert.ok((await actions.createPermissionRequest({},form(period))).error);
     assert.equal(calls.inserted.length,0);
-    assert.equal(calls.uploads,0);
+    assert.equal(calls.evidenceChecks.length,0);
   }
   for (const settings of [{noClass:true},{missingTeacher:true}]) {
     const {actions,calls}=actionEnvironment(settings);
     assert.ok((await actions.createPermissionRequest({},form())).error);
     assert.equal(calls.inserted.length,0);
-    assert.equal(calls.uploads,0);
+    assert.equal(calls.evidenceChecks.length,0);
   }
   const {actions,calls}=actionEnvironment();
   assert.ok((await actions.createPermissionRequest({},form("7","3"))).error);
@@ -98,18 +123,19 @@ test("alasan singkat dan detail opsional disimpan utuh untuk guru dan PDF", asyn
   for (const detail of ["", "Mengikuti seleksi lomba sebagai perwakilan sekolah."]) {
     const {actions,calls}=actionEnvironment();
     const data=form("3","5");data.set("reason","Lomba LKS");data.set("reason_detail",detail);
-    await assert.rejects(()=>actions.createPermissionRequest({},data),/REDIRECT/);
+    assert.deepEqual(await actions.createPermissionRequest({},data), { ok: true });
     assert.equal(calls.inserted[0].reason,detail?`Lomba LKS\n${detail}`:"Lomba LKS");
   }
   for (const [title,detail] of [["Judul terlalu panjang untuk form ini",""],["Hai","Detail yang panjang"],["Lomba LKS","a".repeat(1000)]]) {
     const {actions,calls}=actionEnvironment();const data=form();data.set("reason",title);data.set("reason_detail",detail);
-    assert.ok((await actions.createPermissionRequest({},data)).error);assert.equal(calls.uploads,0);
+    assert.ok((await actions.createPermissionRequest({},data)).error);assert.equal(calls.evidenceChecks.length,0);
   }
 });
 
 const link=({children,href,...props})=>React.createElement("a",{href,...props},children);
+const router = { useRouter: () => ({ push() {} }) };
 test("form siswa menampilkan 11 pilihan dan tidak memiliki tanggal bebas", () => {
-  const loader=createTsLoader({"next/link":link,"./actions":{},"@/hooks/use-form-action":{useFormAction:()=>[{}, {}, false]}});
+  const loader=createTsLoader({"next/link":link,"next/navigation":router,"./actions":{},"@/lib/supabase/client":{},"@/hooks/use-form-action":{useFormAction:()=>[{}, {}, false]}});
   const Page=loader("src/app/(app)/izin/ajukan/page").default;
   const html=renderToStaticMarkup(React.createElement(Page));
   assert.doesNotMatch(html,/datetime-local/);
@@ -123,7 +149,7 @@ test("form siswa menampilkan 11 pilihan dan tidak memiliki tanggal bebas", () =>
 });
 
 test("form izin masuk mempertahankan alasan dan bukti dengan satu pilihan dari 11 jam mapel", async () => {
-  const loader=createTsLoader({"next/link":link,"./actions":{},"@/hooks/use-form-action":{useFormAction:()=>[{}, {}, false]},"@/lib/auth":{requireRole:async role=>assert.equal(role,"siswa")}});
+  const loader=createTsLoader({"next/link":link,"next/navigation":router,"./actions":{},"@/lib/supabase/client":{},"@/hooks/use-form-action":{useFormAction:()=>[{}, {}, false]},"@/lib/auth":{requireRole:async role=>assert.equal(role,"siswa")}});
   const Page=loader("src/app/(app)/izin/masuk-kelas/page").default;
   const html=renderToStaticMarkup(await Page());
   assert.match(html,/name="izin_type" value="masuk_kelas"/);
@@ -142,7 +168,7 @@ test("izin masuk menyimpan satu jam mapel dan mengabaikan jam akhir titipan brow
     const {actions,calls}=actionEnvironment();
     const data=form("3");data.set("izin_type","masuk_kelas");
     if(end===null)data.delete("lesson_period_end");else data.set("lesson_period_end",end);
-    await assert.rejects(()=>actions.createPermissionRequest({},data),/REDIRECT \/izin\?ok=1/);
+    assert.deepEqual(await actions.createPermissionRequest({},data), { ok: true });
     assert.equal(calls.inserted[0].izin_type,"masuk_kelas");
     assert.equal(calls.inserted[0].lesson_period_start,3);
     assert.equal(calls.inserted[0].lesson_period_end,3);
@@ -155,20 +181,84 @@ test("izin masuk menyimpan satu jam mapel dan mengabaikan jam akhir titipan brow
 test("izin masuk tetap menolak guru, bukti kosong, jam salah dan pengajuan ganda", async()=>{
   for(const setting of [{role:"guru_mapel"},{duplicate:true}]){
     const {actions,calls}=actionEnvironment(setting);const data=form();data.set("izin_type","masuk_kelas");
-    assert.ok((await actions.createPermissionRequest({},data)).error);assert.equal(calls.uploads,0);assert.equal(calls.inserted.length,0);
+    assert.ok((await actions.createPermissionRequest({},data)).error);assert.equal(calls.evidenceChecks.length,0);assert.equal(calls.inserted.length,0);
   }
   for(const period of ["0","12","1.5",""]){
     const {actions,calls}=actionEnvironment();const data=form(period);data.set("izin_type","masuk_kelas");
-    assert.ok((await actions.createPermissionRequest({},data)).error);assert.equal(calls.uploads,0);
+    assert.ok((await actions.createPermissionRequest({},data)).error);assert.equal(calls.evidenceChecks.length,0);
   }
-  const {actions,calls}=actionEnvironment();const data=form();data.set("izin_type","masuk_kelas");data.delete("evidence");
+  const {actions,calls}=actionEnvironment();const data=form();data.set("izin_type","masuk_kelas");data.delete("evidence_path");
   assert.match((await actions.createPermissionRequest({},data)).error,/Bukti pendukung wajib/);assert.equal(calls.inserted.length,0);
 });
 
-test("database tanpa jenis izin masuk memberi pesan aktivasi sebelum bukti diunggah",async()=>{
+test("database tanpa jenis izin masuk memberi pesan aktivasi sebelum pengajuan disimpan",async()=>{
   const {actions,calls}=actionEnvironment({pendingError:{code:"22P02"}});const data=form();data.set("izin_type","masuk_kelas");
   assert.match((await actions.createPermissionRequest({},data)).error,/belum diaktifkan di database/);
-  assert.equal(calls.uploads,0);assert.equal(calls.inserted.length,0);
+  assert.equal(calls.evidenceChecks.length,0);assert.equal(calls.inserted.length,0);
+});
+
+test("bukti 5 MB diunggah sekali, percobaan ulang mengirim formulir kecil dan membuka riwayat", async () => {
+  const file = new File([new Uint8Array(5 * 1024 * 1024)], "foto-hp.jpg", { type: "image/jpeg" });
+  let submit;
+  let uploadedPath;
+  let uploadCount = 0;
+  let submitCount = 0;
+  const navigations = [];
+  const loader = createTsLoader({
+    "next/link": link,
+    "next/navigation": { useRouter: () => ({ push: url => navigations.push(url) }) },
+    "@/hooks/use-form-action": { useFormAction(action) { submit = action; return [{}, {}, false]; } },
+    "@/lib/supabase/client": { createClient: () => ({
+      auth: { async getUser() { return { data: { user: { id: "student" } } }; } },
+      storage: { from: () => ({ async upload(path, uploaded) {
+        assert.equal(uploaded, file);
+        uploadedPath = path;
+        uploadCount++;
+        return { error: null };
+      } }) },
+    }) },
+    "./actions": { async createPermissionRequest(_state, data) {
+      assert.equal(data.get("evidence_path"), uploadedPath);
+      assert.equal(data.has("evidence"), false);
+      const request = new Request("http://localhost/izin/ajukan", { method: "POST", body: data });
+      assert.ok((await request.arrayBuffer()).byteLength < 1024);
+      if (++submitCount === 1) throw new TypeError("Koneksi putus");
+      return { ok: true };
+    } },
+  });
+  const PermissionRequestForm = loader("src/app/(app)/izin/ajukan/request-form").default;
+  renderToStaticMarkup(React.createElement(PermissionRequestForm));
+  const submitEvidence = () => {
+    const data = form();
+    data.set("evidence", file);
+    return submit({}, data);
+  };
+  assert.match((await submitEvidence()).error, /Periksa koneksi/);
+  assert.deepEqual(navigations, []);
+  assert.deepEqual(await submitEvidence(), { ok: true });
+  assert.deepEqual(navigations, ["/izin?ok=1"]);
+  assert.equal(uploadCount, 1);
+  assert.match(uploadedPath, /^student\/[0-9a-f-]{36}\.jpg$/);
+});
+
+test("pengajuan memeriksa kepemilikan dan metadata bukti, serta aman dikirim ulang", async () => {
+  const { actions, calls } = actionEnvironment({ stored: { size: 5 * 1024 * 1024, contentType: "image/png" } });
+  const otherStudent = form();
+  otherStudent.set("evidence_path", `other-student/${requestId}.png`);
+  assert.match((await actions.createPermissionRequest({}, otherStudent)).error, /dari akunmu/);
+  assert.deepEqual(calls.evidenceChecks, []);
+  assert.deepEqual(await actions.createPermissionRequest({}, form()), { ok: true });
+  assert.deepEqual(await actions.createPermissionRequest({}, form()), { ok: true });
+  assert.equal(calls.inserted.length, 1);
+  assert.equal(calls.inserted[0].id, requestId);
+  assert.equal(calls.inserted[0].evidence_url, evidencePath);
+  assert.deepEqual(calls.evidenceChecks, [evidencePath]);
+
+  for (const stored of [null, { size: 5 * 1024 * 1024 + 1, contentType: "image/png" }, { size: 1024, contentType: "text/html" }]) {
+    const invalid = actionEnvironment({ stored });
+    assert.ok((await invalid.actions.createPermissionRequest({}, form())).error);
+    assert.equal(invalid.calls.inserted.length, 0);
+  }
 });
 
 test("menu izin masuk hanya tersedia untuk siswa dan masuk ke jalur formulir tersendiri",()=>{

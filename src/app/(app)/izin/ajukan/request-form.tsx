@@ -1,14 +1,17 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Check, Upload } from "lucide-react";
 
 import { createPermissionRequest, lookupSchedule, type CreateState, type LookupResult } from "./actions";
-import { EVIDENCE_MAX_BYTES, EVIDENCE_MIME_TYPES, IZIN_TYPES, IZIN_TYPE_LABELS, LESSON_PERIODS, REQUEST_TITLE_MAX_LENGTH, REQUEST_REASON_MAX_LENGTH } from "@/lib/constants";
+import { EVIDENCE_MIME_TYPES, IZIN_TYPES, IZIN_TYPE_LABELS, LESSON_PERIODS, REQUEST_TITLE_MAX_LENGTH, REQUEST_REASON_MAX_LENGTH, STORAGE_BUCKETS } from "@/lib/constants";
 import { useFormAction } from "@/hooks/use-form-action";
+import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { lessonPeriodLabel, lessonRangeLabel } from "@/features/izin/lesson-periods";
+import { createEvidencePath, evidenceError } from "@/features/izin/evidence";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -18,7 +21,50 @@ const initialState: CreateState = {};
 const fieldClass = "h-11 rounded-lg border-[#a5a7ae] bg-white text-base shadow-none md:h-8 md:text-[11px]";
 
 export default function PermissionRequestForm({ entry = false }: { entry?: boolean }) {
-  const [state, formProps, pending] = useFormAction(createPermissionRequest, initialState);
+  const router = useRouter();
+  const uploadRef = useRef<{ file: File; path: string; uploaded: boolean } | null>(null);
+  const [state, formProps, pending] = useFormAction(async (previous, formData) => {
+    const file = formData.get("evidence");
+    if (!(file instanceof File)) return { error: "Bukti pendukung wajib dilampirkan." };
+    const validationError = evidenceError(file.size, file.type);
+    if (validationError) return { error: validationError };
+
+    let upload = uploadRef.current;
+    try {
+      const supabase = createClient();
+      if (!upload || upload.file !== file) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return { error: "Sesi tidak valid. Silakan login ulang." };
+        upload = { file, path: createEvidencePath(user.id, file.type), uploaded: false };
+        uploadRef.current = upload;
+      }
+
+      if (!upload.uploaded) {
+        const storage = supabase.storage.from(STORAGE_BUCKETS.EVIDENCE);
+        const { error } = await storage.upload(upload.path, file, { contentType: file.type, upsert: false });
+        if (error) {
+          // Periksa apakah unggahan sebelumnya tersimpan meski responsnya terputus.
+          const { data } = await storage.info(upload.path);
+          if (data?.size !== file.size || data?.contentType !== file.type) {
+            return { error: "Bukti belum berhasil diunggah. Periksa koneksi lalu coba kirim lagi." };
+          }
+        }
+        upload.uploaded = true;
+      }
+    } catch {
+      return { error: "Bukti belum berhasil diunggah. Periksa koneksi lalu coba kirim lagi." };
+    }
+
+    formData.delete("evidence");
+    formData.set("evidence_path", upload.path);
+    try {
+      const result = await createPermissionRequest(previous, formData);
+      if (result.ok) router.push("/izin?ok=1");
+      return result;
+    } catch {
+      return { error: "Status pengajuan belum dapat dipastikan. Periksa koneksi lalu coba kirim lagi." };
+    }
+  }, initialState);
   const [startPeriod, setStartPeriod] = useState("");
   const [endPeriod, setEndPeriod] = useState("");
   const [evidence, setEvidence] = useState<{ name: string; size: number } | null>(null);
@@ -87,10 +133,11 @@ export default function PermissionRequestForm({ entry = false }: { entry?: boole
       <div className="flex min-w-0 flex-col gap-2">
         <Label htmlFor="evidence" className="text-[11px] font-medium">Bukti pendukung <span className="text-[#f00000]">*</span></Label>
         <div className={cn("relative min-w-0 rounded-lg border border-dashed px-4 py-4 focus-within:ring-2 focus-within:ring-red-200", fileError ? "border-red-500 bg-red-50" : "border-[#a5a7ae] hover:border-red-400")}>
-          <input id="evidence" name="evidence" type="file" accept={EVIDENCE_MIME_TYPES.join(",")} required aria-invalid={!!fileError} aria-describedby={fileError || evidence ? "evidence-hint evidence-state" : "evidence-hint"} className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+          <input id="evidence" name="evidence" type="file" accept={EVIDENCE_MIME_TYPES.join(",")} required disabled={pending} aria-invalid={!!fileError} aria-describedby={fileError || evidence ? "evidence-hint evidence-state" : "evidence-hint"} className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
             onChange={(event) => {
               const file = event.currentTarget.files?.[0];
-              const message = !file ? "" : file.size > EVIDENCE_MAX_BYTES ? "Ukuran bukti maksimal 5 MB." : !EVIDENCE_MIME_TYPES.includes(file.type) ? "Format harus JPG, PNG, WebP, atau PDF." : "";
+              const message = file ? evidenceError(file.size, file.type) ?? "" : "";
+              uploadRef.current = null;
               event.currentTarget.setCustomValidity(message);
               setFileError(message || null); setEvidence(file ? { name: file.name, size: file.size } : null);
             }} />

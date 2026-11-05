@@ -1,17 +1,15 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getProfile } from "@/lib/auth";
 import { lessonRequestTime, lessonRangeTime } from "@/features/izin/lesson-periods";
+import { evidenceError } from "@/features/izin/evidence";
 import {
   DAY_LABELS,
-  EVIDENCE_MAX_BYTES,
-  EVIDENCE_MIME_TYPES,
   IZIN_TYPES,
   IZIN_TYPE_LABELS,
   REQUEST_STATUS,
@@ -35,7 +33,14 @@ const requestSchema = z.object({
   lesson_period_end: z.coerce.number().int().min(1, "Pilih jam pelajaran akhir.").max(11),
 }).refine((value) => value.lesson_period_end >= value.lesson_period_start, { message: "Jam pelajaran akhir tidak boleh sebelum jam awal.", path: ["lesson_period_end"] });
 
-export type CreateState = { error?: string };
+export type CreateState = { error?: string; ok?: boolean };
+
+function confirmSubmission(): CreateState {
+  revalidatePath("/izin");
+  revalidatePath("/dashboard");
+  revalidatePath("/persetujuan");
+  return { ok: true };
+}
 
 export async function createPermissionRequest(
   _prevState: CreateState,
@@ -72,19 +77,37 @@ export async function createPermissionRequest(
     return { error: parsed.error.issues[0]?.message ?? "Input tidak valid." };
   }
 
+  const evidencePath = formData.get("evidence_path");
+  const ownerPrefix = `${profile.id}/`;
+  if (typeof evidencePath !== "string" || !evidencePath.startsWith(ownerPrefix)) {
+    return { error: "Bukti pendukung wajib dilampirkan dari akunmu." };
+  }
+  const fileName = /^([a-f0-9-]{36})\.(?:jpg|png|webp|pdf)$/.exec(evidencePath.slice(ownerPrefix.length));
+  const requestId = z.uuid().safeParse(fileName?.[1]);
+  if (!requestId.success) return { error: "Bukti tidak valid. Silakan pilih kembali berkasnya." };
+
+  const supabase = await createClient();
+  // ID unggahan menjadi ID pengajuan agar kirim ulang setelah koneksi putus tetap aman.
+  const findSubmitted = () => supabase.from("permission_requests")
+    .select("id")
+    .eq("id", requestId.data)
+    .eq("student_id", profile.id)
+    .eq("evidence_url", evidencePath)
+    .maybeSingle();
+  const submitted = await findSubmitted();
+  if (submitted.error) return { error: "Status pengajuan belum dapat diperiksa. Silakan coba lagi." };
+  if (submitted.data) return confirmSubmission();
+
   const routing = await lookupSchedule(parsed.data.lesson_period_start);
   if (routing.status === "no_class") return { error: "Anda belum terdaftar di kelas. Hubungi Admin sebelum mengajukan izin." };
   if (routing.status === "error") return { error: routing.message };
   if (routing.status === "fallback" && !routing.approver) return { error: "Guru pada jam pelajaran ini dan wali kelas belum tersedia. Hubungi Admin untuk melengkapi jadwal atau wali kelas." };
 
-  const supabase = await createClient();
-
-  // Cegah pengajuan dobel: satu pengajuan menunggu per jenis izin. Dicek di sini
-  // agar bukti tidak sempat diunggah; DB juga menjaganya (migrasi 0012).
+  // Cegah pengajuan dobel: satu pengajuan menunggu per jenis izin (migrasi 0012).
   const duplicateMsg = `Masih ada pengajuan "${IZIN_TYPE_LABELS[parsed.data.izin_type]}" yang menunggu persetujuan. Tunggu keputusannya atau batalkan dulu di menu Riwayat.`;
   const { data: pendingSame, error: pendingError } = await supabase
     .from("permission_requests")
-    .select("id")
+    .select("id, evidence_url")
     .eq("student_id", profile.id)
     .eq("izin_type", parsed.data.izin_type)
     .eq("status", REQUEST_STATUS.PENDING)
@@ -96,28 +119,18 @@ export async function createPermissionRequest(
     }
     return { error: "Pengajuan yang masih menunggu belum dapat diperiksa. Silakan coba lagi." };
   }
-  if (pendingSame) return { error: duplicateMsg };
+  if (pendingSame) {
+    if (pendingSame.id === requestId.data && pendingSame.evidence_url === evidencePath) return confirmSubmission();
+    return { error: duplicateMsg };
+  }
 
-  // Upload bukti (WAJIB — antisipasi izin fiktif / siswa berbohong).
-  const file = formData.get("evidence");
-  if (!(file instanceof File) || file.size === 0) {
-    return { error: "Bukti pendukung wajib dilampirkan." };
+  const { data: stored, error: storageError } = await supabase.storage
+    .from(STORAGE_BUCKETS.EVIDENCE).info(evidencePath);
+  if (storageError || !stored) {
+    return { error: "Bukti belum dapat diperiksa. Coba kirim lagi atau pilih kembali berkasnya." };
   }
-  if (file.size > EVIDENCE_MAX_BYTES) {
-    return { error: "Ukuran bukti maksimal 5MB." };
-  }
-  if (!EVIDENCE_MIME_TYPES.includes(file.type)) {
-    return { error: "Bukti harus berupa gambar (JPG/PNG/WebP) atau PDF." };
-  }
-  const ext = file.name.includes(".") ? `.${file.name.split(".").pop()}` : "";
-  // Konvensi path: "<user_id>/<uuid>.<ext>" (folder pertama = pemilik, sesuai policy Storage)
-  const evidencePath = `${profile.id}/${crypto.randomUUID()}${ext}`;
-  const { error: uploadError } = await supabase.storage
-    .from(STORAGE_BUCKETS.EVIDENCE)
-    .upload(evidencePath, file, { contentType: file.type, upsert: false });
-  if (uploadError) {
-    return { error: `Gagal mengunggah bukti: ${uploadError.message}` };
-  }
+  const validationError = evidenceError(stored.size ?? stored.metadata?.size, stored.contentType ?? stored.metadata?.mimetype);
+  if (validationError) return { error: validationError };
 
   const { requestedAt, requestedUntil } = lessonRangeTime(parsed.data.lesson_period_start, parsed.data.lesson_period_end);
 
@@ -126,6 +139,7 @@ export async function createPermissionRequest(
   const { error: insertError } = await supabase
     .from("permission_requests")
     .insert({
+      id: requestId.data,
       student_id: profile.id,
       class_id: profile.class_id,
       izin_type: parsed.data.izin_type,
@@ -138,22 +152,16 @@ export async function createPermissionRequest(
     });
 
   if (insertError) {
-    // Best-effort: hapus bukti yang sudah terlanjur diunggah
-    if (evidencePath) {
-      await supabase.storage
-        .from(STORAGE_BUCKETS.EVIDENCE)
-        .remove([evidencePath]);
+    if (insertError.code === "23505") {
+      const retry = await findSubmitted();
+      if (retry.data) return confirmSubmission();
+      return { error: duplicateMsg };
     }
-    // 23505 = dua pengajuan dikirim bersamaan (mis. dari dua tab).
-    if (insertError.code === "23505") return { error: duplicateMsg };
     if (insertError.code === "PGRST204" || insertError.code === "42703") return { error: "Form izin memerlukan pembaruan database. Hubungi administrator SIPENSI." };
     return { error: `Gagal menyimpan pengajuan: ${insertError.message}` };
   }
 
-  revalidatePath("/izin");
-  revalidatePath("/dashboard");
-  revalidatePath("/persetujuan");
-  redirect("/izin?ok=1");
+  return confirmSubmission();
 }
 
 // ==========================================================================
