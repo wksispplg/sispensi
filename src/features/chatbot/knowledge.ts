@@ -51,13 +51,13 @@ export const KNOWLEDGE = [
   {
     id: "durasi",
     title: "Rentang jam pelajaran awal dan akhir untuk izin",
-    answer: "Waktu izin dipilih dari jam pelajaran awal sampai jam pelajaran akhir (1–11) untuk hari ini dalam WIB. Waktu istirahat tidak dihitung sebagai jam pelajaran. Guru penanggung jawab mengikuti jadwal pada jam awal. Fitur pemantauan keluar/kembali dan timer dispen sudah tidak digunakan.",
+    answer: "Waktu izin dipilih dari jam pelajaran awal sampai jam pelajaran akhir yang tersedia pada form hari ini (WIB). Jadwal reguler menggunakan jam ke-1 sampai ke-11. Waktu istirahat tidak dihitung sebagai jam pelajaran. Guru penanggung jawab mengikuti jadwal pada jam awal. Fitur pemantauan keluar/kembali dan timer dispen sudah tidak digunakan.",
     match: /\b(durasi|timer|countdown|hitung mundur|berapa menit|mulai dispen|kembali ke sekolah|terlambat|batas waktu dispen)\b/,
   },
   {
     id: "pengajuan",
     title: "Cara mengisi formulir dan mengajukan izin",
-    answer: "Login sebagai siswa, buka menu Ajukan Izin, lalu pilih jenis izin serta jam pelajaran awal dan akhir (1–11) untuk hari ini (WIB). Isi alasan dan lampirkan bukti pendukung. Waktu istirahat tidak dihitung sebagai jam pelajaran. Periksa isian, lalu tekan Kirim Pengajuan. Perkembangannya dapat dilihat di Riwayat Pengajuan.",
+    answer: "Login sebagai siswa, buka menu Ajukan Izin, lalu pilih jenis izin serta jam pelajaran awal dan akhir yang tersedia untuk hari ini (WIB). Isi alasan dan lampirkan bukti pendukung. Waktu istirahat tidak dihitung sebagai jam pelajaran. Periksa isian, lalu tekan Kirim Pengajuan. Perkembangannya dapat dilihat di Riwayat Pengajuan.",
     match: /\b(ajukan|mengajukan|pengajuan|mengisi|formulir|form|minta izin|bikin izin|buat izin|cara.*dispen)\b/,
     links: [{ label: "Login untuk mengajukan izin", href: LOGIN_PATH }],
   },

@@ -1,0 +1,123 @@
+---
+title: Rancangan Basis Data SisPensi
+config:
+  theme: base
+  themeVariables:
+    fontFamily: 'Segoe UI, Arial, sans-serif'
+    fontSize: '16px'
+    primaryColor: '#eef2f7'
+    primaryTextColor: '#172235'
+    primaryBorderColor: '#78869a'
+    lineColor: '#506078'
+    tertiaryColor: '#ffffff'
+  er:
+    diagramPadding: 12
+    entityPadding: 6
+    nodeSpacing: 60
+    rankSpacing: 40
+---
+erDiagram
+    direction LR
+
+    %% Kolom utama dan seluruh FK menurut migrasi 0001–0016.
+    AUTH_USERS["auth.users"] {
+        uuid id PK
+    }
+    profiles {
+        uuid id PK, FK
+        uuid class_id FK
+        text full_name
+        user_role role
+        text nis UK
+    }
+    classes {
+        uuid id PK
+        text name UK
+        smallint grade_level
+        text major
+        uuid homeroom_teacher_id FK
+    }
+    subjects {
+        uuid id PK
+        text name UK
+        text code
+    }
+    schedules {
+        uuid id PK
+        uuid class_id FK
+        uuid subject_id FK
+        uuid teacher_id FK
+        smallint day_of_week
+        time start_time
+        time end_time
+    }
+    permission_requests {
+        uuid id PK
+        uuid student_id FK
+        uuid class_id FK
+        uuid matched_schedule_id FK
+        uuid current_approver_id FK
+        uuid decided_by FK
+        izin_type izin_type
+        request_status status
+        text reason
+        text evidence_url
+        smallint lesson_period_start
+        smallint lesson_period_end
+        timestamptz requested_at
+        timestamptz requested_until
+        smallint current_layer
+        timestamptz current_deadline
+        timestamptz decided_at
+    }
+    approval_logs {
+        uuid id PK
+        uuid request_id FK
+        uuid approver_id FK
+        smallint layer
+        approval_action action
+        text note
+        timestamptz created_at
+    }
+    digital_letters {
+        uuid id PK
+        uuid request_id FK, UK
+        text letter_number UK
+        text pdf_url
+        uuid qr_token UK
+        timestamptz issued_at
+    }
+    notifications {
+        uuid id PK
+        uuid user_id FK
+        uuid request_id FK
+        text title
+        text message
+        boolean is_read
+        timestamptz created_at
+    }
+    escalation_settings {
+        smallint layer PK
+        integer timeout_minutes
+        timestamptz updated_at
+    }
+
+    AUTH_USERS ||--o| profiles : "profil"
+    classes |o..o{ profiles : "kelas siswa"
+    profiles |o..o{ classes : "wali kelas"
+    classes ||..o{ schedules : "jadwal kelas"
+    subjects |o..o{ schedules : "mapel"
+    profiles |o..o{ schedules : "guru mapel"
+    profiles ||..o{ permission_requests : "pengaju"
+    profiles |o..o{ permission_requests : "peninjau aktif"
+    profiles |o..o{ permission_requests : "pemberi keputusan"
+    classes |o..o{ permission_requests : "kelas saat pengajuan"
+    schedules |o..o{ permission_requests : "jadwal terpilih"
+    permission_requests ||..o{ approval_logs : "log izin"
+    profiles |o..o{ approval_logs : "pelaku tindakan"
+    permission_requests ||..o| digital_letters : "surat digital"
+    profiles ||..o{ notifications : "penerima"
+    permission_requests |o..o{ notifications : "notifikasi izin"
+
+    classDef main fill:#fdeceb,stroke:#b64239,stroke-width:2px
+    class permission_requests main

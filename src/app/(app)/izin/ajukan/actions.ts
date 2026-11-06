@@ -6,7 +6,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getProfile } from "@/lib/auth";
-import { DISPENSATION_PERIOD_ENDED, lessonRequestTime, lessonRangeTime } from "@/features/izin/lesson-periods";
+import { DEMO_LESSON_PERIOD, DISPENSATION_PERIOD_ENDED, LESSON_PERIOD_UNAVAILABLE, lessonPeriodsToday, lessonRequestTime, lessonRangeTime } from "@/features/izin/lesson-periods";
 import { evidenceError } from "@/features/izin/evidence";
 import {
   DAY_LABELS,
@@ -20,6 +20,7 @@ import {
 } from "@/lib/constants";
 
 const IZIN_VALUES = Object.values(IZIN_TYPES) as [IzinType, ...IzinType[]];
+const periodNumberSchema = z.coerce.number().int().min(1).refine((number) => number <= 11 || number === DEMO_LESSON_PERIOD.number, LESSON_PERIOD_UNAVAILABLE);
 
 const requestSchema = z.object({
   izin_type: z.enum(IZIN_VALUES, { error: "Jenis izin tidak valid" }),
@@ -28,8 +29,8 @@ const requestSchema = z.object({
     .trim()
     .min(5, "Alasan minimal 5 karakter")
     .max(REQUEST_REASON_MAX_LENGTH, "Alasan maksimal 1000 karakter"),
-  lesson_period_start: z.coerce.number().int().min(1, "Pilih jam pelajaran awal.").max(11),
-  lesson_period_end: z.coerce.number().int().min(1, "Pilih jam pelajaran akhir.").max(11),
+  lesson_period_start: periodNumberSchema,
+  lesson_period_end: periodNumberSchema,
 }).refine((value) => value.lesson_period_end >= value.lesson_period_start, { message: "Jam pelajaran akhir tidak boleh sebelum jam awal.", path: ["lesson_period_end"] });
 
 export type CreateState = { error?: string; ok?: boolean };
@@ -102,8 +103,15 @@ export async function createPermissionRequest(
     return { error: message };
   };
 
-  const { requestedAt, requestedUntil, date, period } = lessonRangeTime(parsed.data.lesson_period_start, parsed.data.lesson_period_end);
-  const deadline = parsed.data.izin_type === IZIN_TYPES.MASUK_KELAS ? Infinity : Date.parse(`${date}T${period.end}:00+07:00`);
+  const now = new Date();
+  const periods = lessonPeriodsToday(now);
+  const { lesson_period_start: start, lesson_period_end: end } = parsed.data;
+  if (!periods.some((period) => period.number === start) || !periods.some((period) => period.number === end)) {
+    return confirmOrReturnError(LESSON_PERIOD_UNAVAILABLE);
+  }
+  const { requestedAt, requestedUntil, date, period } = lessonRangeTime(start, end, now);
+  const hasCutoff = parsed.data.izin_type !== IZIN_TYPES.MASUK_KELAS || start === DEMO_LESSON_PERIOD.number;
+  const deadline = hasCutoff ? Date.parse(`${date}T${period.end}:00+07:00`) : Infinity;
   if (Date.now() >= deadline) return confirmOrReturnError(DISPENSATION_PERIOD_ENDED);
 
   const { data: stored, error: storageError } = await supabase.storage
@@ -169,12 +177,14 @@ export type LookupResult =
   | { status: "no_class" };
 
 export async function lookupSchedule(periodNumber: number | string): Promise<LookupResult> {
-  const parsedPeriod = z.coerce.number().int().min(1).max(11).safeParse(periodNumber);
+  const parsedPeriod = periodNumberSchema.safeParse(periodNumber);
   if (!parsedPeriod.success) return { status: "choose_period" };
+  const now = new Date();
+  if (!lessonPeriodsToday(now).some((period) => period.number === parsedPeriod.data)) return { status: "choose_period" };
   const profile = await getProfile();
   if (!profile || profile.role !== ROLES.SISWA || !profile.class_id) return { status: "no_class" };
 
-  const { day: dow, time, period } = lessonRequestTime(parsedPeriod.data);
+  const { day: dow, time, period } = lessonRequestTime(parsedPeriod.data, now);
   const dayLabel = DAY_LABELS[dow] ?? "";
 
   // Service role: hanya membaca jadwal/guru untuk kelas siswa itu sendiri.

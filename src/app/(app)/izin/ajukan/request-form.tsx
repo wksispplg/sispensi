@@ -10,7 +10,7 @@ import { EVIDENCE_MIME_TYPES, IZIN_TYPES, IZIN_TYPE_LABELS, LESSON_PERIODS, REQU
 import { useFormAction } from "@/hooks/use-form-action";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
-import { DISPENSATION_PERIOD_ENDED, firstAvailableLessonPeriod, lessonPeriodLabel, lessonRangeLabel } from "@/features/izin/lesson-periods";
+import { DEMO_LESSON_PERIOD, DISPENSATION_PERIOD_ENDED, firstAvailableLessonPeriod, lessonPeriodLabel, lessonPeriodsToday, lessonRangeLabel } from "@/features/izin/lesson-periods";
 import { createEvidencePath, evidenceError } from "@/features/izin/evidence";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,7 +26,7 @@ export default function PermissionRequestForm({ entry = false }: { entry?: boole
   const [saving, setSaving] = useState(false);
   const [state, formProps, pending] = useFormAction(async (previous, formData) => {
     const start = Number(formData.get("lesson_period_start"));
-    if (!entry && !uploadRef.current?.uploaded && start > 0 && start < firstAvailableLessonPeriod()) {
+    if ((!entry || start === DEMO_LESSON_PERIOD.number) && !uploadRef.current?.uploaded && start > 0 && start < firstAvailableLessonPeriod()) {
       return { error: DISPENSATION_PERIOD_ENDED };
     }
     const file = formData.get("evidence");
@@ -77,24 +77,30 @@ export default function PermissionRequestForm({ entry = false }: { entry?: boole
   }, initialState);
   const [startPeriod, setStartPeriod] = useState("");
   const [endPeriod, setEndPeriod] = useState("");
+  const [periods, setPeriods] = useState<ReturnType<typeof lessonPeriodsToday>>(LESSON_PERIODS);
   const [firstAvailable, setFirstAvailable] = useState(1);
   const [evidence, setEvidence] = useState<{ name: string; size: number } | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const [preview, setPreview] = useState<LookupResult | null>(null);
   const [previewPending, startPreview] = useTransition();
-  const startExpired = !entry && !!startPeriod && Number(startPeriod) < firstAvailable;
-  const allPeriodsEnded = !entry && firstAvailable > LESSON_PERIODS.length;
+  const startNumber = Number(startPeriod);
+  const startExpired = (!entry || startNumber === DEMO_LESSON_PERIOD.number) && startNumber > 0 && startNumber < firstAvailable;
+  const allPeriodsEnded = !entry && firstAvailable > periods[periods.length - 1].number;
 
   useEffect(() => {
-    if (entry) return;
     let timer = window.setTimeout(refresh, 0);
     function refresh() {
       const now = new Date();
+      const availablePeriods = lessonPeriodsToday(now);
+      setPeriods(availablePeriods);
+      const keepAvailable = (value: string) => availablePeriods.some((period) => period.number === Number(value)) ? value : "";
+      setStartPeriod(keepAvailable);
+      setEndPeriod(keepAvailable);
       setFirstAvailable(firstAvailableLessonPeriod(now));
       timer = window.setTimeout(refresh, 60_000 - now.getTime() % 60_000);
     }
     return () => window.clearTimeout(timer);
-  }, [entry]);
+  }, []);
 
   useEffect(() => {
     if (!startPeriod || startExpired) return;
@@ -140,8 +146,8 @@ export default function PermissionRequestForm({ entry = false }: { entry?: boole
             <SelectNative id="lesson_period_start" name="lesson_period_start" required value={startPeriod} disabled={allPeriodsEnded} className={fieldClass}
               onChange={(event) => { const value = event.target.value; setStartPeriod(value); if (endPeriod && Number(endPeriod) < Number(value)) setEndPeriod(""); setPreview(null); }}>
               <option value="" disabled>{entry ? "Pilih jam mapel masuk" : "Pilih jam mapel mulai"}</option>
-              {LESSON_PERIODS.map((period) => {
-                const ended = !entry && period.number < firstAvailable;
+              {periods.map((period) => {
+                const ended = (!entry || period.number === DEMO_LESSON_PERIOD.number) && period.number < firstAvailable;
                 return <option key={period.number} value={period.number} disabled={ended}>{lessonPeriodLabel(period.number)}{ended ? " · Selesai" : ""}</option>;
               })}
             </SelectNative>
@@ -150,7 +156,7 @@ export default function PermissionRequestForm({ entry = false }: { entry?: boole
             <Label htmlFor="lesson_period_end" className="sr-only">Sampai jam pelajaran</Label>
             <SelectNative id="lesson_period_end" name="lesson_period_end" required value={endPeriod} disabled={!startPeriod || startExpired} onChange={(event) => setEndPeriod(event.target.value)} className={fieldClass}>
               <option value="" disabled>Pilih jam mapel selesai</option>
-              {LESSON_PERIODS.filter((period) => period.number >= Number(startPeriod)).map((period) => <option key={period.number} value={period.number}>{lessonPeriodLabel(period.number)}</option>)}
+              {periods.filter((period) => period.number >= startNumber).map((period) => <option key={period.number} value={period.number}>{lessonPeriodLabel(period.number)}</option>)}
             </SelectNative>
           </div>}
         </div>

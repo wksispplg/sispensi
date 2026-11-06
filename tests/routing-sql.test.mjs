@@ -164,5 +164,34 @@ test("migrasi dan trigger PostgreSQL mengarahkan izin sesuai waktu izin secara a
       await db.query("update public.permission_requests set status = 'approved' where id = $1", [pendingId]);
       assert.equal((await db.query("select status from public.permission_requests where id = $1", [pendingId])).rows[0].status, "approved");
     });
+    await t.test("jam demo hanya valid pada 6 November WIB dan memakai wali kelas jika jadwal kosong", async () => {
+      const demoMigration = fs.readFileSync(path.join(projectRoot, "supabase/migrations/0017_demo_lesson_period_nov_6.sql"), "utf8");
+      await db.exec(demoMigration);
+      await db.exec(demoMigration);
+      const insert = (type, start, end, period = 13) => db.query(`
+        insert into public.permission_requests(class_id,student_id,evidence_url,izin_type,requested_at,requested_until,lesson_period_start,lesson_period_end)
+        values($1,$2,'bukti.png',$3,$4,$5,$6,$6) returning id`, [classId, student, type, start, end, period]);
+      const start = "2026-11-06T16:00:00+07:00";
+      const end = "2026-11-06T23:59:00+07:00";
+
+      await db.exec("create or replace function auth.uid() returns uuid language sql as $$ select null::uuid $$");
+      try {
+        const { rows: [request] } = await insert("dispensasi", start, end);
+        const { rows: [assigned] } = await db.query("select current_approver_id from public.permission_requests where id = $1", [request.id]);
+        assert.equal(assigned.current_approver_id, wali);
+        await assert.rejects(() => insert("dispensasi", "2026-11-13T16:00:00+07:00", "2026-11-13T23:59:00+07:00"), /pr_lesson_period_range/);
+        await assert.rejects(() => insert("dispensasi", start, "2026-11-07T00:00:00+07:00"), /pr_lesson_period_range/);
+        await assert.rejects(() => insert("dispensasi", start, end, 12), /pr_lesson_period_range/);
+      } finally { await db.exec(`create or replace function auth.uid() returns uuid language sql as $$ select '${student}'::uuid $$`); }
+
+      await db.exec("set role authenticated");
+      try {
+        const { rows: [clock] } = await db.query(`select (local_now::date = date '2026-11-06' and local_now::time < time '23:59') as open
+          from (select statement_timestamp() at time zone 'Asia/Jakarta' as local_now) as clock`);
+        if (clock.open) await insert("dispensasi", start, end);
+        else await assert.rejects(() => insert("masuk_kelas", start, end), /dispensation_period_ended/);
+        await assert.rejects(() => insert("dispensasi", "2026-11-13T16:00:00+07:00", "2026-11-13T23:59:00+07:00"), /dispensation_period_ended/);
+      } finally { await db.exec("reset role"); }
+    });
   } finally {await db.close();}
 });

@@ -6,7 +6,7 @@ import { createTsLoader } from "./helpers/load-ts.mjs";
 
 const load = createTsLoader();
 const { LESSON_PERIODS } = load("src/lib/constants");
-const { firstAvailableLessonPeriod, lessonRequestTime, lessonPeriodLabel, lessonRangeTime, lessonRangeLabel } = load("src/features/izin/lesson-periods");
+const { firstAvailableLessonPeriod, lessonPeriodsToday, lessonRequestTime, lessonPeriodLabel, lessonRangeTime, lessonRangeLabel } = load("src/features/izin/lesson-periods");
 
 const beforePeriodThree = Date.parse("2026-11-06T01:00:00Z");
 const endOfPeriodThree = Date.parse("2026-11-06T02:40:00Z");
@@ -135,8 +135,45 @@ test("opsi jam mulai mengikuti akhir tiap jam di WIB, termasuk setelah jam terak
   assert.equal(firstAvailableLessonPeriod(new Date(endOfPeriodThree - 1)), 3);
   assert.equal(firstAvailableLessonPeriod(new Date(endOfPeriodThree)), 4);
   assert.equal(firstAvailableLessonPeriod(new Date("2026-11-06T01:45:00Z")), 3); // Istirahat 08.45 WIB.
-  assert.equal(firstAvailableLessonPeriod(new Date("2026-11-06T09:00:00Z")), 12);
+  assert.equal(firstAvailableLessonPeriod(new Date("2026-11-13T09:00:00Z")), 12);
   assert.equal(firstAvailableLessonPeriod(new Date("2026-11-06T17:00:00Z")), 1);
+});
+
+test("jam ke-13 hanya tersedia 6 November WIB, dengan label historis yang tetap dapat dibaca", () => {
+  const start = new Date("2026-11-06T09:00:00Z");
+  assert.deepEqual(lessonPeriodsToday(start).at(-1), { number: 13, start: "16:00", end: "23:59" });
+  assert.equal(lessonRangeTime(13, 13, start).requestedUntil, "2026-11-06T16:59:00.000Z");
+  assert.equal(firstAvailableLessonPeriod(start), 13);
+  assert.equal(firstAvailableLessonPeriod(new Date("2026-11-06T16:59:00Z")), 14);
+  for (const date of ["2026-11-05T16:59:59Z", "2026-11-06T17:00:00Z", "2026-11-13T09:00:00Z"]) {
+    const now = new Date(date);
+    assert.equal(lessonPeriodsToday(now).at(-1).number, 11);
+    assert.throws(() => lessonRangeTime(11, 13, now), /Jam pelajaran akhir/);
+  }
+  assert.equal(lessonRangeLabel(13, 13), "Jam ke-13 (16.00–23.59 WIB)");
+});
+
+test("server menerima jam demo sebelum 23.59 dan menolak slot yang sama pada hari lain", async (t) => {
+  t.mock.timers.setTime(Date.parse("2026-11-06T16:58:59Z"));
+  const { actions, calls } = actionEnvironment();
+  assert.deepEqual(await actions.createPermissionRequest({}, form("13")), { ok: true });
+  assert.equal(calls.inserted[0].requested_at, "2026-11-06T09:00:00.000Z");
+  assert.equal(calls.inserted[0].requested_until, "2026-11-06T16:59:00.000Z");
+  const fallback = actionEnvironment({ missingTeacher: true, homeroom: { full_name: "Wali Contoh", role: "wali_kelas" } });
+  assert.deepEqual(await fallback.actions.lookupSchedule(13), { status: "fallback", day: "Jumat", approver: "Wali Contoh" });
+
+  t.mock.timers.setTime(Date.parse("2026-11-06T16:59:00Z"));
+  const late = actionEnvironment();
+  const entry = form("13");
+  entry.set("izin_type", "masuk_kelas");
+  for (const data of [form("13"), entry]) {
+    assert.match((await late.actions.createPermissionRequest({}, data)).error, /Jam mulai sudah berakhir/);
+  }
+  t.mock.timers.setTime(Date.parse("2026-11-13T09:00:00Z"));
+  assert.equal((await late.actions.lookupSchedule(13)).status, "choose_period");
+  assert.match((await late.actions.createPermissionRequest({}, form("13"))).error, /jam pelajaran yang tersedia/i);
+  assert.deepEqual(late.calls.inserted, []);
+  assert.deepEqual(late.calls.evidenceChecks, []);
 });
 
 test("dispensasi memakai batas jam mulai dan kirim ulang pengajuan yang tersimpan tetap berhasil", async (t) => {
