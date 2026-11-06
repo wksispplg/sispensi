@@ -136,5 +136,33 @@ test("migrasi dan trigger PostgreSQL mengarahkan izin sesuai waktu izin secara a
       await assert.rejects(()=>db.query(`insert into public.permission_requests(class_id,student_id,evidence_url,izin_type,requested_at)
         values($1,$2,'bukti.png','masuk_kelas','2026-11-03T02:00:00Z')`,[classId,student]),/pr_class_entry_single_period/);
     });
+    await t.test("database membatasi pengajuan dispensasi baru berdasarkan jam mulai dan tanggal WIB", async () => {
+      const cutoffMigration = fs.readFileSync(path.join(projectRoot, "supabase/migrations/0016_dispensation_period_cutoff.sql"), "utf8");
+      await db.exec(cutoffMigration);
+      await db.exec(cutoffMigration);
+      const insert = (type, dayOffset, start, end = start) => db.query(`
+        with school_day as (
+          select (statement_timestamp() at time zone 'Asia/Jakarta')::date + $4::int as day
+        )
+        insert into public.permission_requests(class_id,student_id,evidence_url,izin_type,requested_at,requested_until,lesson_period_start,lesson_period_end)
+        select $1,$2,'bukti.png',$3,
+          (day + public.lesson_period_clock($5,false)) at time zone 'Asia/Jakarta',
+          (day + public.lesson_period_clock($6,true)) at time zone 'Asia/Jakarta',$5,$6
+        from school_day`, [classId, student, type, dayOffset, start, end]);
+      await db.exec("set role authenticated");
+      try {
+        await assert.rejects(() => insert("dispensasi", -1, 3), /dispensation_period_ended/);
+        await assert.rejects(() => insert("dispensasi", 1, 3), /dispensation_period_ended/);
+        await insert("masuk_kelas", -1, 3);
+        const { rows: [today] } = await db.query(`select local_time < time '16:00' as open,
+          local_time >= time '07:50' as first_ended
+          from (select (statement_timestamp() at time zone 'Asia/Jakarta')::time as local_time) as clock`);
+        if (today.first_ended) await assert.rejects(() => insert("dispensasi", 0, 1, 11), /dispensation_period_ended/);
+        if (today.open) await insert("dispensasi", 0, 11);
+        else await assert.rejects(() => insert("dispensasi", 0, 11), /dispensation_period_ended/);
+      } finally { await db.exec("reset role"); }
+      await db.query("update public.permission_requests set status = 'approved' where id = $1", [pendingId]);
+      assert.equal((await db.query("select status from public.permission_requests where id = $1", [pendingId])).rows[0].status, "approved");
+    });
   } finally {await db.close();}
 });

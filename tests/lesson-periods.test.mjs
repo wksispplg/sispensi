@@ -1,12 +1,16 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import test, { beforeEach } from "node:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createTsLoader } from "./helpers/load-ts.mjs";
 
 const load = createTsLoader();
 const { LESSON_PERIODS } = load("src/lib/constants");
-const { lessonRequestTime, lessonPeriodLabel, lessonRangeTime, lessonRangeLabel } = load("src/features/izin/lesson-periods");
+const { firstAvailableLessonPeriod, lessonRequestTime, lessonPeriodLabel, lessonRangeTime, lessonRangeLabel } = load("src/features/izin/lesson-periods");
+
+const beforePeriodThree = Date.parse("2026-11-06T01:00:00Z");
+const endOfPeriodThree = Date.parse("2026-11-06T02:40:00Z");
+beforeEach((t) => t.mock.timers.enable({ apis: ["Date"], now: beforePeriodThree }));
 
 test("pilihan jam 1-11 mengikuti gambar, tanpa slot pembukaan/istirahat", () => {
   assert.deepEqual(LESSON_PERIODS.map(p => [p.number, p.start, p.end]), [
@@ -28,7 +32,7 @@ test("tanggal otomatis WIB tetap benar saat hari/tahun UTC berbeda", () => {
 const requestId = "70000000-0000-4000-8000-000000000001";
 const evidencePath = `student/${requestId}.png`;
 
-function actionEnvironment({ missingTeacher=false, noClass=false, role="siswa", insertError=null, duplicate=false, homeroom=null, stored={ size:1024, contentType:"image/png" } }={}) {
+function actionEnvironment({ missingTeacher=false, noClass=false, role="siswa", insertError=null, duplicate=false, homeroom=null, stored={ size:1024, contentType:"image/png" }, onEvidenceCheck }={}) {
   const calls = { inserted:[], evidenceChecks:[], filters:[], scheduleReads:0 };
   const profile = { id:"student", role, class_id:noClass?null:"class" };
   const admin = { from(table) {
@@ -51,6 +55,7 @@ function actionEnvironment({ missingTeacher=false, noClass=false, role="siswa", 
   } };
   const storage = { from: () => ({ async info(path) {
     calls.evidenceChecks.push(path);
+    onEvidenceCheck?.();
     return { data: stored, error: null };
   } }) };
   const client = { storage, from() {
@@ -126,6 +131,38 @@ test("pengajuan menyimpan waktu jam terpilih dan mengabaikan tanggal titipan bro
   assert.deepEqual(calls.filters,[]);
 });
 
+test("opsi jam mulai mengikuti akhir tiap jam di WIB, termasuk setelah jam terakhir", () => {
+  assert.equal(firstAvailableLessonPeriod(new Date(endOfPeriodThree - 1)), 3);
+  assert.equal(firstAvailableLessonPeriod(new Date(endOfPeriodThree)), 4);
+  assert.equal(firstAvailableLessonPeriod(new Date("2026-11-06T01:45:00Z")), 3); // Istirahat 08.45 WIB.
+  assert.equal(firstAvailableLessonPeriod(new Date("2026-11-06T09:00:00Z")), 12);
+  assert.equal(firstAvailableLessonPeriod(new Date("2026-11-06T17:00:00Z")), 1);
+});
+
+test("dispensasi memakai batas jam mulai dan kirim ulang pengajuan yang tersimpan tetap berhasil", async (t) => {
+  const { actions, calls } = actionEnvironment();
+  t.mock.timers.setTime(endOfPeriodThree - 1);
+  assert.deepEqual(await actions.createPermissionRequest({}, form("3", "5")), { ok: true });
+  t.mock.timers.setTime(endOfPeriodThree);
+  assert.deepEqual(await actions.createPermissionRequest({}, form("3", "5")), { ok: true });
+  const fresh = actionEnvironment();
+  assert.match((await fresh.actions.createPermissionRequest({}, form("3", "5"))).error, /Jam mulai sudah berakhir/);
+  assert.deepEqual(fresh.calls.evidenceChecks, []);
+  assert.deepEqual(fresh.calls.inserted, []);
+  assert.deepEqual(await fresh.actions.createPermissionRequest({}, form("4", "5")), { ok: true });
+  assert.equal(calls.inserted.length, 1);
+});
+
+test("jam yang berakhir saat bukti diperiksa atau saat database menerima kiriman ditolak", async (t) => {
+  const duringCheck = actionEnvironment({ onEvidenceCheck: () => t.mock.timers.setTime(endOfPeriodThree) });
+  assert.match((await duringCheck.actions.createPermissionRequest({}, form("3", "5"))).error, /Jam mulai sudah berakhir/);
+  assert.equal(duringCheck.calls.inserted.length, 0);
+  t.mock.timers.setTime(endOfPeriodThree - 1);
+  const duringInsert = actionEnvironment({ insertError: { code: "P0001", message: "dispensation_period_ended" } });
+  assert.match((await duringInsert.actions.createPermissionRequest({}, form("3", "5"))).error, /Jam mulai sudah berakhir/);
+  assert.equal(duringInsert.calls.inserted.length, 0);
+});
+
 test("nomor jam salah, kelas kosong dan guru kosong tidak menyimpan pengajuan", async () => {
   for (const period of ["","0","12","1.5"]) {
     const {actions,calls}=actionEnvironment();
@@ -189,7 +226,8 @@ test("form izin masuk mempertahankan alasan dan bukti dengan satu pilihan dari 1
   assert.equal((html.match(/<select/g)||[]).length,1);
 });
 
-test("izin masuk menyimpan satu jam mapel dan mengabaikan jam akhir titipan browser", async()=>{
+test("izin masuk menyimpan satu jam mapel dan mengabaikan jam akhir titipan browser", async(t)=>{
+  t.mock.timers.setTime(endOfPeriodThree);
   for(const end of [null,"11"]) {
     const {actions,calls}=actionEnvironment();
     const data=form("3");data.set("izin_type","masuk_kelas");
@@ -223,7 +261,7 @@ test("database tanpa jenis izin masuk memberi pesan aktivasi sebelum pengajuan d
   assert.equal(calls.evidenceChecks.length,1);assert.equal(calls.inserted.length,0);
 });
 
-test("bukti 5 MB diunggah sekali, percobaan ulang mengirim formulir kecil dan membuka riwayat", async () => {
+test("bukti 5 MB diunggah sekali, percobaan ulang mengirim formulir kecil dan membuka riwayat", async (t) => {
   const file = new File([new Uint8Array(5 * 1024 * 1024)], "foto-hp.jpg", { type: "image/jpeg" });
   let submit;
   let uploadedPath;
@@ -259,6 +297,10 @@ test("bukti 5 MB diunggah sekali, percobaan ulang mengirim formulir kecil dan me
     data.set("evidence", file);
     return submit({}, data);
   };
+  t.mock.timers.setTime(endOfPeriodThree);
+  assert.match((await submitEvidence()).error, /Jam mulai sudah berakhir/);
+  assert.equal(uploadCount, 0);
+  t.mock.timers.setTime(beforePeriodThree);
   assert.match((await submitEvidence()).error, /Periksa koneksi/);
   assert.deepEqual(navigations, []);
   assert.deepEqual(await submitEvidence(), { ok: true });

@@ -6,7 +6,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getProfile } from "@/lib/auth";
-import { lessonRequestTime, lessonRangeTime } from "@/features/izin/lesson-periods";
+import { DISPENSATION_PERIOD_ENDED, lessonRequestTime, lessonRangeTime } from "@/features/izin/lesson-periods";
 import { evidenceError } from "@/features/izin/evidence";
 import {
   DAY_LABELS,
@@ -90,25 +90,29 @@ export async function createPermissionRequest(
 
   const supabase = await createClient();
   // ID unggahan menjadi ID pengajuan agar kirim ulang setelah koneksi putus tetap aman.
-  const findSubmitted = () => supabase.from("permission_requests")
-    .select("id")
-    .eq("id", requestId.data)
-    .eq("student_id", profile.id)
-    .eq("evidence_url", evidencePath)
-    .maybeSingle();
+  const confirmOrReturnError = async (message: string): Promise<CreateState> => {
+    const submitted = await supabase.from("permission_requests")
+      .select("id")
+      .eq("id", requestId.data)
+      .eq("student_id", profile.id)
+      .eq("evidence_url", evidencePath)
+      .maybeSingle();
+    if (submitted.data) return confirmSubmission();
+    if (submitted.error) return { error: "Status pengajuan belum dapat diperiksa. Silakan coba lagi." };
+    return { error: message };
+  };
+
+  const { requestedAt, requestedUntil, date, period } = lessonRangeTime(parsed.data.lesson_period_start, parsed.data.lesson_period_end);
+  const deadline = parsed.data.izin_type === IZIN_TYPES.MASUK_KELAS ? Infinity : Date.parse(`${date}T${period.end}:00+07:00`);
+  if (Date.now() >= deadline) return confirmOrReturnError(DISPENSATION_PERIOD_ENDED);
 
   const { data: stored, error: storageError } = await supabase.storage
     .from(STORAGE_BUCKETS.EVIDENCE).info(evidencePath);
   const validationError = storageError || !stored
     ? "Bukti belum dapat diperiksa. Coba kirim lagi atau pilih kembali berkasnya."
     : evidenceError(stored.size ?? stored.metadata?.size, stored.contentType ?? stored.metadata?.mimetype);
-  if (validationError) {
-    const submitted = await findSubmitted();
-    if (submitted.data) return confirmSubmission();
-    return { error: validationError };
-  }
-
-  const { requestedAt, requestedUntil } = lessonRangeTime(parsed.data.lesson_period_start, parsed.data.lesson_period_end);
+  if (validationError) return confirmOrReturnError(validationError);
+  if (Date.now() >= deadline) return confirmOrReturnError(DISPENSATION_PERIOD_ENDED);
 
   // Database memeriksa duplikat dan menetapkan guru dalam transaksi yang sama.
   const { error: insertError } = await supabase
@@ -128,10 +132,10 @@ export async function createPermissionRequest(
 
   if (insertError) {
     if (insertError.code === "23505") {
-      const retry = await findSubmitted();
-      if (retry.data) return confirmSubmission();
-      if (retry.error) return { error: "Status pengajuan belum dapat diperiksa. Silakan coba lagi." };
-      return { error: `Masih ada pengajuan "${IZIN_TYPE_LABELS[parsed.data.izin_type]}" yang menunggu persetujuan. Tunggu keputusannya atau batalkan dulu di menu Riwayat.` };
+      return confirmOrReturnError(`Masih ada pengajuan "${IZIN_TYPE_LABELS[parsed.data.izin_type]}" yang menunggu persetujuan. Tunggu keputusannya atau batalkan dulu di menu Riwayat.`);
+    }
+    if (insertError.code === "P0001" && insertError.message === "dispensation_period_ended") {
+      return confirmOrReturnError(DISPENSATION_PERIOD_ENDED);
     }
     if (insertError.code === "P0001" && insertError.message.includes("wali kelas belum tersedia")) {
       return { error: "Guru pada jam pelajaran ini dan wali kelas belum tersedia. Hubungi Admin untuk melengkapi jadwal atau wali kelas." };

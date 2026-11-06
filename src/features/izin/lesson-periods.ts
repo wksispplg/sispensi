@@ -1,5 +1,16 @@
 import { LESSON_PERIODS } from "@/lib/constants";
 
+export const DISPENSATION_PERIOD_ENDED = "Jam mulai sudah berakhir. Pilih jam yang masih berlangsung atau belum dimulai.";
+
+const wibClock = new Intl.DateTimeFormat("en-GB", {
+  timeZone: "Asia/Jakarta", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+});
+
+export function firstAvailableLessonPeriod(now = new Date()) {
+  const time = wibClock.format(now);
+  return LESSON_PERIODS.find((period) => time < period.end)?.number ?? LESSON_PERIODS.length + 1;
+}
+
 export function getLessonPeriod(number: number) {
   return LESSON_PERIODS.find((period) => period.number === number);
 }

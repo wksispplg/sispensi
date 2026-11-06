@@ -10,7 +10,7 @@ import { EVIDENCE_MIME_TYPES, IZIN_TYPES, IZIN_TYPE_LABELS, LESSON_PERIODS, REQU
 import { useFormAction } from "@/hooks/use-form-action";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
-import { lessonPeriodLabel, lessonRangeLabel } from "@/features/izin/lesson-periods";
+import { DISPENSATION_PERIOD_ENDED, firstAvailableLessonPeriod, lessonPeriodLabel, lessonRangeLabel } from "@/features/izin/lesson-periods";
 import { createEvidencePath, evidenceError } from "@/features/izin/evidence";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,6 +25,10 @@ export default function PermissionRequestForm({ entry = false }: { entry?: boole
   const uploadRef = useRef<{ file: File; path: string; uploaded: boolean } | null>(null);
   const [saving, setSaving] = useState(false);
   const [state, formProps, pending] = useFormAction(async (previous, formData) => {
+    const start = Number(formData.get("lesson_period_start"));
+    if (!entry && !uploadRef.current?.uploaded && start > 0 && start < firstAvailableLessonPeriod()) {
+      return { error: DISPENSATION_PERIOD_ENDED };
+    }
     const file = formData.get("evidence");
     if (!(file instanceof File)) return { error: "Bukti pendukung wajib dilampirkan." };
     const validationError = evidenceError(file.size, file.type);
@@ -73,13 +77,27 @@ export default function PermissionRequestForm({ entry = false }: { entry?: boole
   }, initialState);
   const [startPeriod, setStartPeriod] = useState("");
   const [endPeriod, setEndPeriod] = useState("");
+  const [firstAvailable, setFirstAvailable] = useState(1);
   const [evidence, setEvidence] = useState<{ name: string; size: number } | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const [preview, setPreview] = useState<LookupResult | null>(null);
   const [previewPending, startPreview] = useTransition();
+  const startExpired = !entry && !!startPeriod && Number(startPeriod) < firstAvailable;
+  const allPeriodsEnded = !entry && firstAvailable > LESSON_PERIODS.length;
 
   useEffect(() => {
-    if (!startPeriod) return;
+    if (entry) return;
+    let timer = window.setTimeout(refresh, 0);
+    function refresh() {
+      const now = new Date();
+      setFirstAvailable(firstAvailableLessonPeriod(now));
+      timer = window.setTimeout(refresh, 60_000 - now.getTime() % 60_000);
+    }
+    return () => window.clearTimeout(timer);
+  }, [entry]);
+
+  useEffect(() => {
+    if (!startPeriod || startExpired) return;
     let active = true;
     const handle = setTimeout(() => {
       startPreview(async () => {
@@ -88,10 +106,10 @@ export default function PermissionRequestForm({ entry = false }: { entry?: boole
       });
     }, 150);
     return () => { active = false; clearTimeout(handle); };
-  }, [startPeriod]);
+  }, [startPeriod, startExpired]);
 
   const selectedEnd = entry ? startPeriod : endPeriod;
-  const canSubmit = !pending && !previewPending && !fileError && !!startPeriod && !!selectedEnd && !!preview && (preview.status === "found" || (preview.status === "fallback" && !!preview.approver));
+  const canSubmit = !pending && !previewPending && !fileError && !startExpired && !!startPeriod && !!selectedEnd && !!preview && (preview.status === "found" || (preview.status === "fallback" && !!preview.approver));
   const timeLabel = lessonRangeLabel(Number(startPeriod), Number(selectedEnd));
 
   return <div className="grid min-w-0 items-start gap-5 pt-2 lg:grid-cols-[minmax(0,1.85fr)_minmax(240px,1fr)] lg:pt-3">
@@ -119,21 +137,25 @@ export default function PermissionRequestForm({ entry = false }: { entry?: boole
         <div className={cn("grid min-w-0 gap-3", entry ? "max-w-xs" : "sm:grid-cols-2")}>
           <div className="min-w-0">
             <Label htmlFor="lesson_period_start" className="sr-only">{entry ? "Jam pelajaran masuk kelas" : "Dari jam pelajaran"}</Label>
-            <SelectNative id="lesson_period_start" name="lesson_period_start" required value={startPeriod} className={fieldClass}
+            <SelectNative id="lesson_period_start" name="lesson_period_start" required value={startPeriod} disabled={allPeriodsEnded} className={fieldClass}
               onChange={(event) => { const value = event.target.value; setStartPeriod(value); if (endPeriod && Number(endPeriod) < Number(value)) setEndPeriod(""); setPreview(null); }}>
               <option value="" disabled>{entry ? "Pilih jam mapel masuk" : "Pilih jam mapel mulai"}</option>
-              {LESSON_PERIODS.map((period) => <option key={period.number} value={period.number}>{lessonPeriodLabel(period.number)}</option>)}
+              {LESSON_PERIODS.map((period) => {
+                const ended = !entry && period.number < firstAvailable;
+                return <option key={period.number} value={period.number} disabled={ended}>{lessonPeriodLabel(period.number)}{ended ? " · Selesai" : ""}</option>;
+              })}
             </SelectNative>
           </div>
           {!entry && <div className="min-w-0">
             <Label htmlFor="lesson_period_end" className="sr-only">Sampai jam pelajaran</Label>
-            <SelectNative id="lesson_period_end" name="lesson_period_end" required value={endPeriod} disabled={!startPeriod} onChange={(event) => setEndPeriod(event.target.value)} className={fieldClass}>
+            <SelectNative id="lesson_period_end" name="lesson_period_end" required value={endPeriod} disabled={!startPeriod || startExpired} onChange={(event) => setEndPeriod(event.target.value)} className={fieldClass}>
               <option value="" disabled>Pilih jam mapel selesai</option>
               {LESSON_PERIODS.filter((period) => period.number >= Number(startPeriod)).map((period) => <option key={period.number} value={period.number}>{lessonPeriodLabel(period.number)}</option>)}
             </SelectNative>
           </div>}
         </div>
         <p className="mt-2 text-[10px] leading-relaxed text-[#6f7380]">Berlaku untuk hari ini (WIB). Jam istirahat tidak dihitung.</p>
+        {(allPeriodsEnded || startExpired) && <p role="status" className="mt-1 text-xs text-red-700">{allPeriodsEnded ? "Semua jam pelajaran hari ini sudah berakhir." : DISPENSATION_PERIOD_ENDED}</p>}
         {entry && <p className="mt-1 text-[10px] leading-relaxed text-[#6f7380]">Pilih satu jam pelajaran saat kamu akan masuk kelas.</p>}
         {timeLabel ? <p className="mt-1 text-[11px] text-[#555d65]">{timeLabel}</p> : null}
       </fieldset>
